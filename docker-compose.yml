@@ -1,0 +1,46 @@
+version: "3.7"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    command:
+      - "blob-api"
+    depends_on:
+      - minio
+      - create-buckets
+  archiver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      - "blob-archiver"
+    env_file:
+      - .env
+    depends_on:
+      - minio
+      - create-buckets
+  minio:
+    restart: unless-stopped
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9999:9999"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+    entrypoint: minio server /data --console-address ":9999"
+  create-buckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set minio http://minio:9000 admin password;
+      /usr/bin/mc mb minio/blobs;
+      /usr/bin/mc policy set public minio/blobs;
+      exit 0;
+      "
