@@ -14,19 +14,17 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 )
 
 func setup(t *testing.T, beacon *beacontest.StubBeaconClient) (*ArchiverService, *storagetest.TestFileStorage) {
 	l := testlog.Logger(t, log.LvlInfo)
 	fs := storagetest.NewTestFileStorage(t, l)
-	registry := prometheus.NewRegistry()
-	m := metrics.NewMetrics(registry)
-	svc, err := NewArchiverService(l, flags.ArchiverConfig{
+	m := metrics.NewMetrics()
+	svc, err := NewService(l, flags.ArchiverConfig{
 		PollInterval: 5 * time.Second,
 		OriginBlock:  blobtest.OriginBlock,
-	}, fs, beacon, m, registry)
+	}, fs, beacon, m)
 	require.NoError(t, err)
 	return svc, fs
 }

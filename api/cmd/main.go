@@ -13,7 +13,6 @@ import (
 	opservice "github.com/ethereum-optimism/optimism/op-service"
 	"github.com/ethereum-optimism/optimism/op-service/cliapp"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
-	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
 )
@@ -54,8 +53,7 @@ func Main() cliapp.LifecycleAction {
 		oplog.SetGlobalLogHandler(l.GetHandler())
 		opservice.ValidateEnvVars(flags.EnvVarPrefix, flags.Flags, l)
 
-		registry := opmetrics.NewRegistry()
-		m := metrics.NewMetrics(registry)
+		m := metrics.NewMetrics()
 
 		storageClient, err := storage.NewStorage(cfg.StorageConfig, l)
 		if err != nil {
@@ -68,6 +66,7 @@ func Main() cliapp.LifecycleAction {
 		}
 
 		l.Info("Initializing API Service")
-		return service.NewAPIService(l, storageClient, beaconClient, cfg, registry, m), nil
+		api := service.NewAPI(storageClient, beaconClient, m, l)
+		return service.NewService(l, api, cfg, m.Registry()), nil
 	}
 }

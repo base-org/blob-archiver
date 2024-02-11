@@ -16,7 +16,6 @@ import (
 	"github.com/base-org/blob-archiver/common/beacon/beacontest"
 	"github.com/base-org/blob-archiver/common/blobtest"
 	"github.com/base-org/blob-archiver/common/storage"
-	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -58,10 +57,9 @@ func setup(t *testing.T) (*API, *storage.FileStorage, *beacontest.StubBeaconClie
 	require.NoError(t, err)
 	fs := storage.NewFileStorage(tempDir, logger)
 	beacon := beacontest.NewEmptyStubBeaconClient()
-	r := opmetrics.NewRegistry()
-	m := metrics.NewMetrics(r)
-	api := NewAPI(fs, beacon, m, r, logger)
-	return api, fs, beacon, func() {
+	m := metrics.NewMetrics()
+	a := NewAPI(fs, beacon, m, logger)
+	return a, fs, beacon, func() {
 		require.NoError(t, os.RemoveAll(tempDir))
 	}
 }

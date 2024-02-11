@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"github.com/ethereum-optimism/optimism/op-service/metrics"
+	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -16,16 +17,20 @@ var (
 )
 
 type Metricer interface {
+	Registry() *prometheus.Registry
 	RecordBlockIdType(t BlockIdType)
 }
 
 type metricsRecorder struct {
 	inputType *prometheus.CounterVec
+	registry  *prometheus.Registry
 }
 
-func NewMetrics(registry *prometheus.Registry) Metricer {
+func NewMetrics() Metricer {
+	registry := opmetrics.NewRegistry()
 	factory := metrics.With(registry)
 	return &metricsRecorder{
+		registry: registry,
 		inputType: factory.NewCounterVec(prometheus.CounterOpts{
 			Namespace: MetricsNamespace,
 			Name:      "block_id_type",
@@ -36,4 +41,8 @@ func NewMetrics(registry *prometheus.Registry) Metricer {
 
 func (m *metricsRecorder) RecordBlockIdType(t BlockIdType) {
 	m.inputType.WithLabelValues(string(t)).Inc()
+}
+
+func (m *metricsRecorder) Registry() *prometheus.Registry {
+	return m.registry
 }

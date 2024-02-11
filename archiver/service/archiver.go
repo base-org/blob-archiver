@@ -16,7 +16,6 @@ import (
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 const backfillErrorRetryInterval = 5 * time.Second
@@ -28,11 +27,10 @@ type BeaconClient interface {
 	client.BeaconBlockHeadersProvider
 }
 
-func NewArchiverService(l log.Logger, cfg flags.ArchiverConfig, dataStoreClient storage.DataStore, client BeaconClient, m metrics.Metricer, registry *prometheus.Registry) (*ArchiverService, error) {
+func NewService(l log.Logger, cfg flags.ArchiverConfig, dataStoreClient storage.DataStore, client BeaconClient, m metrics.Metricer) (*ArchiverService, error) {
 	return &ArchiverService{
 		log:             l,
 		cfg:             cfg,
-		registry:        registry,
 		dataStoreClient: dataStoreClient,
 		metrics:         m,
 		stopCh:          make(chan struct{}),
@@ -46,7 +44,6 @@ type ArchiverService struct {
 	log             log.Logger
 	dataStoreClient storage.DataStore
 	beaconClient    BeaconClient
-	registry        *prometheus.Registry
 	metricsServer   *httputil.HTTPServer
 	cfg             flags.ArchiverConfig
 	metrics         metrics.Metricer
@@ -55,7 +52,7 @@ type ArchiverService struct {
 func (a *ArchiverService) Start(ctx context.Context) error {
 	if a.cfg.MetricsConfig.Enabled {
 		a.log.Info("starting metrics server", "addr", a.cfg.MetricsConfig.ListenAddr, "port", a.cfg.MetricsConfig.ListenPort)
-		srv, err := opmetrics.StartServer(a.registry, a.cfg.MetricsConfig.ListenAddr, a.cfg.MetricsConfig.ListenPort)
+		srv, err := opmetrics.StartServer(a.metrics.Registry(), a.cfg.MetricsConfig.ListenAddr, a.cfg.MetricsConfig.ListenPort)
 		if err != nil {
 			return err
 		}

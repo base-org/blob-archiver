@@ -6,10 +6,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	client "github.com/attestantio/go-eth2-client"
 	"github.com/base-org/blob-archiver/api/flags"
-	"github.com/base-org/blob-archiver/api/metrics"
-	"github.com/base-org/blob-archiver/common/storage"
 	"github.com/ethereum-optimism/optimism/op-service/httputil"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/ethereum/go-ethereum/log"
@@ -18,13 +15,12 @@ import (
 
 var ErrAlreadyStopped = errors.New("already stopped")
 
-func NewAPIService(l log.Logger, dataStoreClient storage.DataStoreReader, beaconClient client.BeaconBlockHeadersProvider, cfg flags.APIConfig, registry *prometheus.Registry, m metrics.Metricer) *APIService {
-	router := NewAPI(dataStoreClient, beaconClient, m, registry, l)
+func NewService(l log.Logger, api *API, cfg flags.APIConfig, registry *prometheus.Registry) *APIService {
 	return &APIService{
 		log:      l,
 		cfg:      cfg,
 		registry: registry,
-		router:   router,
+		api:      api,
 	}
 }
 
@@ -35,7 +31,7 @@ type APIService struct {
 	registry      *prometheus.Registry
 	metricsServer *httputil.HTTPServer
 	apiServer     *httputil.HTTPServer
-	router        *API
+	api           *API
 }
 
 func (a *APIService) Start(ctx context.Context) error {
@@ -52,7 +48,7 @@ func (a *APIService) Start(ctx context.Context) error {
 
 	a.log.Debug("starting API server", "address", a.cfg.ListenAddr)
 
-	srv, err := httputil.StartHTTPServer(a.cfg.ListenAddr, a.router.router)
+	srv, err := httputil.StartHTTPServer(a.cfg.ListenAddr, a.api.router)
 	if err != nil {
 		return fmt.Errorf("failed to start API server: %w", err)
 	}

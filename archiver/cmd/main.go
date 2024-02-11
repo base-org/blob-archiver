@@ -13,7 +13,6 @@ import (
 	opservice "github.com/ethereum-optimism/optimism/op-service"
 	"github.com/ethereum-optimism/optimism/op-service/cliapp"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
-	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
 )
@@ -55,8 +54,7 @@ func Main() cliapp.LifecycleAction {
 		oplog.SetGlobalLogHandler(l.GetHandler())
 		opservice.ValidateEnvVars(flags.EnvVarPrefix, flags.Flags, l)
 
-		registry := opmetrics.NewRegistry()
-		m := metrics.NewMetrics(registry)
+		m := metrics.NewMetrics()
 
 		beaconClient, err := beacon.NewBeaconClient(context.Background(), cfg.BeaconConfig)
 		if err != nil {
@@ -69,6 +67,6 @@ func Main() cliapp.LifecycleAction {
 		}
 
 		l.Info("Initializing Archiver Service")
-		return service.NewArchiverService(l, cfg, storageClient, beaconClient, m, registry)
+		return service.NewService(l, cfg, storageClient, beaconClient, m)
 	}
 }

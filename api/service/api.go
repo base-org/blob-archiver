@@ -22,7 +22,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 type httpError struct {
@@ -77,7 +76,7 @@ type API struct {
 	metrics         m.Metricer
 }
 
-func NewAPI(dataStoreClient storage.DataStoreReader, beaconClient client.BeaconBlockHeadersProvider, metrics m.Metricer, registry *prometheus.Registry, logger log.Logger) *API {
+func NewAPI(dataStoreClient storage.DataStoreReader, beaconClient client.BeaconBlockHeadersProvider, metrics m.Metricer, logger log.Logger) *API {
 	result := &API{
 		dataStoreClient: dataStoreClient,
 		beaconClient:    beaconClient,
@@ -92,7 +91,7 @@ func NewAPI(dataStoreClient storage.DataStoreReader, beaconClient client.BeaconB
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Heartbeat("/healthz"))
 
-	recorder := opmetrics.NewPromHTTPRecorder(registry, m.MetricsNamespace)
+	recorder := opmetrics.NewPromHTTPRecorder(metrics.Registry(), m.MetricsNamespace)
 	r.Use(func(handler http.Handler) http.Handler {
 		return opmetrics.NewHTTPRecordingMiddleware(recorder, handler)
 	})
