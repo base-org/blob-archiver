@@ -163,6 +163,16 @@ func TestAPIService(t *testing.T) {
 			},
 		},
 		{
+			name:   "deduplicates indices",
+			path:   "/eth/v1/beacon/blob_sidecars/1234?indices=1,1,1",
+			status: 200,
+			expected: &storage.BlobSidecars{
+				Data: []*deneb.BlobSidecar{
+					blockTwo.BlobSidecars.Data[1],
+				},
+			},
+		},
+		{
 			name:   "indices out of bounds returns empty array",
 			path:   "/eth/v1/beacon/blob_sidecars/1234?indices=3",
 			status: 200,

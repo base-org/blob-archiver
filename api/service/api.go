@@ -218,14 +218,14 @@ func filterBlobs(blobs []*deneb.BlobSidecar, indices string) ([]*deneb.BlobSidec
 		return blobs, nil
 	}
 
-	indicesMap := map[deneb.BlobIndex]bool{}
+	indicesMap := map[deneb.BlobIndex]struct{}{}
 	for _, index := range splits {
 		parsedInt, err := strconv.ParseUint(index, 10, 64)
 		if err != nil {
 			return nil, newIndicesError(index)
 		}
 		blobIndex := deneb.BlobIndex(parsedInt)
-		indicesMap[blobIndex] = true
+		indicesMap[blobIndex] = struct{}{}
 	}
 
 	filteredBlobs := make([]*deneb.BlobSidecar, 0)
