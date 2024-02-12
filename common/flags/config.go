@@ -8,19 +8,25 @@ import (
 )
 
 type DataStorage string
+type S3CredentialType string
 
 const (
-	DataStorageUnknown DataStorage = "unknown"
-	DataStorageS3      DataStorage = "s3"
-	DataStorageFile    DataStorage = "file"
+	DataStorageUnknown  DataStorage      = "unknown"
+	DataStorageS3       DataStorage      = "s3"
+	DataStorageFile     DataStorage      = "file"
+	S3CredentialUnknown S3CredentialType = "unknown"
+	S3CredentialStatic  S3CredentialType = "static"
+	S3CredentialIAM     S3CredentialType = "iam"
 )
 
 type S3Config struct {
-	Endpoint        string
-	AccessKey       string
-	SecretAccessKey string
-	UseHttps        bool
-	Bucket          string
+	Endpoint string
+	UseHttps bool
+	Bucket   string
+
+	S3CredentialType S3CredentialType
+	AccessKey        string
+	SecretAccessKey  string
 }
 
 func (c S3Config) check() error {
@@ -28,12 +34,18 @@ func (c S3Config) check() error {
 		return errors.New("s3 endpoint must be set")
 	}
 
-	if c.AccessKey == "" {
-		return errors.New("s3 access key must be set")
+	if c.S3CredentialType == S3CredentialUnknown {
+		return errors.New("s3 credential type must be set")
 	}
 
-	if c.SecretAccessKey == "" {
-		return errors.New("s3 secret access key must be set")
+	if c.S3CredentialType == S3CredentialStatic {
+		if c.AccessKey == "" {
+			return errors.New("s3 access key must be set")
+		}
+
+		if c.SecretAccessKey == "" {
+			return errors.New("s3 secret access key must be set")
+		}
 	}
 
 	if c.Bucket == "" {
@@ -85,12 +97,22 @@ func toDataStorage(s string) DataStorage {
 
 func readS3Config(ctx *cli.Context) S3Config {
 	return S3Config{
-		Endpoint:        ctx.String(S3EndpointFlagName),
-		AccessKey:       ctx.String(S3AccessKeyFlagName),
-		SecretAccessKey: ctx.String(S3SecretAccessKeyFlagName),
-		UseHttps:        ctx.Bool(S3EndpointHttpsFlagName),
-		Bucket:          ctx.String(S3BucketFlagName),
+		Endpoint:         ctx.String(S3EndpointFlagName),
+		AccessKey:        ctx.String(S3AccessKeyFlagName),
+		SecretAccessKey:  ctx.String(S3SecretAccessKeyFlagName),
+		UseHttps:         ctx.Bool(S3EndpointHttpsFlagName),
+		Bucket:           ctx.String(S3BucketFlagName),
+		S3CredentialType: toS3CredentialType(ctx.String(S3CredentialTypeFlagName)),
 	}
+}
+
+func toS3CredentialType(s string) S3CredentialType {
+	if s == string(S3CredentialStatic) {
+		return S3CredentialStatic
+	} else if s == string(S3CredentialIAM) {
+		return S3CredentialIAM
+	}
+	return S3CredentialUnknown
 }
 
 func (c BeaconConfig) Check() error {

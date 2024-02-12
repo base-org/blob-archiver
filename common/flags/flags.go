@@ -9,6 +9,7 @@ const (
 	BeaconHttpFlagName              = "l1-beacon-http"
 	BeaconHttpClientTimeoutFlagName = "l1-beacon-client-timeout"
 	DataStoreFlagName               = "data-store"
+	S3CredentialTypeFlagName        = "s3-credential-type"
 	S3EndpointFlagName              = "s3-endpoint"
 	S3EndpointHttpsFlagName         = "s3-endpoint-https"
 	S3AccessKeyFlagName             = "s3-access-key"
@@ -34,6 +35,11 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		},
 		// Optional Flags
 		// S3 Data Store Flags
+		&cli.StringFlag{
+			Name:    S3CredentialTypeFlagName,
+			Usage:   "The way to authenticate to S3, options are [iam, static]",
+			EnvVars: opservice.PrefixEnvVar(envPrefix, "S3_CREDENTIAL_TYPE"),
+		},
 		&cli.StringFlag{
 			Name:    S3EndpointFlagName,
 			Usage:   "The URL for the S3 bucket (without the scheme http or https specified)",

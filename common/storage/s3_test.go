@@ -24,11 +24,12 @@ func setupS3(t *testing.T) *S3Storage {
 	l := testlog.Logger(t, log.LvlInfo)
 
 	s3, err := NewS3Storage(flags.S3Config{
-		Endpoint:        "localhost:9000",
-		AccessKey:       "admin",
-		SecretAccessKey: "password",
-		UseHttps:        false,
-		Bucket:          "blobs",
+		Endpoint:         "localhost:9000",
+		AccessKey:        "admin",
+		SecretAccessKey:  "password",
+		UseHttps:         false,
+		Bucket:           "blobs",
+		S3CredentialType: flags.S3CredentialStatic,
 	}, l)
 
 	require.NoError(t, err)
