@@ -19,8 +19,15 @@ type S3Storage struct {
 }
 
 func NewS3Storage(cfg flags.S3Config, l log.Logger) (*S3Storage, error) {
+	var c *credentials.Credentials
+	if cfg.S3CredentialType == flags.S3CredentialStatic {
+		c = credentials.NewStaticV4(cfg.AccessKey, cfg.SecretAccessKey, "")
+	} else {
+		c = credentials.NewIAM("")
+	}
+
 	client, err := minio.New(cfg.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretAccessKey, ""),
+		Creds:  c,
 		Secure: cfg.UseHttps,
 	})
 
