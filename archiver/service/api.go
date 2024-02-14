@@ -21,6 +21,7 @@ type API struct {
 	metrics m.Metricer
 }
 
+// NewAPI creates a new Archiver API instance. This API exposes an admin interface to control the archiver.
 func NewAPI(metrics m.Metricer, logger log.Logger) *API {
 	result := &API{
 		router:  chi.NewRouter(),

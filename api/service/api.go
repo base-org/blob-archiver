@@ -150,6 +150,8 @@ func (a *API) toBeaconBlockHash(id string) (common.Hash, *httpError) {
 	}
 }
 
+// blobSidecarHandler implements the /eth/v1/beacon/blob_sidecars/{id} endpoint, using the underlying DataStoreReader
+// to fetch blobs instead of the beacon node. This allows clients to fetch expired blobs.
 func (a *API) blobSidecarHandler(w http.ResponseWriter, r *http.Request) {
 	param := chi.URLParam(r, "id")
 	beaconBlockHash, err := a.toBeaconBlockHash(param)

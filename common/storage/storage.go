@@ -15,8 +15,11 @@ const (
 )
 
 var (
+	// ErrNotFound is returned when a blob is not found in the storage.
 	ErrNotFound = errors.New("blob not found")
-	ErrStorage  = errors.New("error accessing storage")
+	// ErrStorage is returned when there is an error accessing the storage.
+	ErrStorage = errors.New("error accessing storage")
+	// ErrEncoding is returned when there is an error in blob encoding or decoding.
 	ErrEncoding = errors.New("error encoding/decoding blob")
 )
 
@@ -28,6 +31,8 @@ type BlobSidecars struct {
 	Data []*deneb.BlobSidecar `json:"data"`
 }
 
+// MarshalSSZ marshals the blob sidecars into SSZ. As the blob sidecars are a single list of fixed size elements, we can
+// simply concatenate the marshaled sidecars together.
 func (b *BlobSidecars) MarshalSSZ() ([]byte, error) {
 	result := make([]byte, b.SizeSSZ())
 
@@ -55,15 +60,32 @@ type BlobData struct {
 	BlobSidecars BlobSidecars `json:"blob_sidecars"`
 }
 
+// DataStoreReader is the interface for reading from a data store.
 type DataStoreReader interface {
+	// Exists returns true if the given blob hash exists in the data store, false otherwise.
+	// It should return one of the following:
+	// - nil: the existence check was successful. In this case the boolean should also be set correctly.
+	// - ErrStorage: there was an error accessing the data store.
 	Exists(ctx context.Context, hash common.Hash) (bool, error)
+	// Read reads the blob data for the given beacon block hash from the data store.
+	// It should return one of the following:
+	// - nil: reading the blob was successful. The blob data is also returned.
+	// - ErrNotFound: the blob data was not found in the data store.
+	// - ErrStorage: there was an error accessing the data store.
+	// - ErrEncoding: there was an error decoding the blob data.
 	Read(ctx context.Context, hash common.Hash) (BlobData, error)
 }
 
+// DataStoreWriter is the interface for writing to a data store.
 type DataStoreWriter interface {
+	// Write writes the given blob data to the data store. It should return one of the following errors:
+	// - nil: writing the blob was successful.
+	// - ErrStorage: there was an error accessing the data store.
+	// - ErrEncoding: there was an error encoding the blob data.
 	Write(ctx context.Context, data BlobData) error
 }
 
+// DataStore is the interface for a data store that can be both written to and read from.
 type DataStore interface {
 	DataStoreReader
 	DataStoreWriter

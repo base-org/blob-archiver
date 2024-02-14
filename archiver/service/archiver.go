@@ -52,6 +52,10 @@ type ArchiverService struct {
 	api             *API
 }
 
+// Start starts the archiver service. It begins polling the beacon node for the latest blocks and persisting blobs for
+// them. Concurrently it'll also begin a backfill process (see backfillBlobs) to store all blobs from the current head
+// to the previously stored blocks. This ensures that during restarts or outages of an archiver, any gaps will be
+// filled in.
 func (a *ArchiverService) Start(ctx context.Context) error {
 	if a.cfg.MetricsConfig.Enabled {
 		a.log.Info("starting metrics server", "addr", a.cfg.MetricsConfig.ListenAddr, "port", a.cfg.MetricsConfig.ListenPort)
@@ -82,6 +86,11 @@ func (a *ArchiverService) Start(ctx context.Context) error {
 	return a.trackLatestBlocks(ctx)
 }
 
+// persistBlobsForBlockToS3 fetches the blobs for a given block and persists them to S3. It returns the block header
+// and a boolean indicating whether the blobs already existed in S3 and any errors that occur.
+// If the blobs are already stored, it will not overwrite the data. Currently, the archiver does not
+// perform any validation of the blobs, it assumes a trusted beacon node. See:
+// https://github.com/base-org/blob-archiver/issues/4.
 func (a *ArchiverService) persistBlobsForBlockToS3(ctx context.Context, blockIdentifier string) (*v1.BeaconBlockHeader, bool, error) {
 	currentHeader, err := a.beaconClient.BeaconBlockHeader(ctx, &api.BeaconBlockHeaderOpts{
 		Block: blockIdentifier,
@@ -121,6 +130,7 @@ func (a *ArchiverService) persistBlobsForBlockToS3(ctx context.Context, blockIde
 		BlobSidecars: storage.BlobSidecars{Data: blobSidecars.Data},
 	}
 
+	// The blob that is being written has not been validated. It is assumed that the beacon node is trusted.
 	err = a.dataStoreClient.Write(ctx, blobData)
 
 	if err != nil {
@@ -133,6 +143,7 @@ func (a *ArchiverService) persistBlobsForBlockToS3(ctx context.Context, blockIde
 	return currentHeader.Data, false, nil
 }
 
+// Stops the archiver service.
 func (a *ArchiverService) Stop(ctx context.Context) error {
 	if a.stopped.Load() {
 		return ErrAlreadyStopped
@@ -155,6 +166,9 @@ func (a *ArchiverService) Stopped() bool {
 	return a.stopped.Load()
 }
 
+// backfillBlobs will persist all blobs from the provided beacon block header, to either the last block that was persisted
+// to the archivers storage or the origin block in the configuration. This is used to ensure that any gaps can be filled.
+// If an error is encountered persisting a block, it will retry after waiting for a period of time.
 func (a *ArchiverService) backfillBlobs(ctx context.Context, latest *v1.BeaconBlockHeader) {
 	current, alreadyExists, err := latest, false, error(nil)
 
@@ -182,6 +196,7 @@ func (a *ArchiverService) backfillBlobs(ctx context.Context, latest *v1.BeaconBl
 	a.log.Info("backfill complete", "endHash", current.Root.String(), "startHash", latest.Root.String())
 }
 
+// trackLatestBlocks will poll the beacon node for the latest blocks and persist blobs for them.
 func (a *ArchiverService) trackLatestBlocks(ctx context.Context) error {
 	t := time.NewTicker(a.cfg.PollInterval)
 	defer t.Stop()
@@ -198,6 +213,9 @@ func (a *ArchiverService) trackLatestBlocks(ctx context.Context) error {
 	}
 }
 
+// processBlocksUntilKnownBlock will fetch and persist blobs for blocks until it finds a block that has been stored before.
+// In the case of a reorg, it will fetch the new head and then walk back the chain, storing all blobs until it finds a
+// known block -- that already exists in the archivers' storage.
 func (a *ArchiverService) processBlocksUntilKnownBlock(ctx context.Context) {
 	a.log.Debug("refreshing live data")
 

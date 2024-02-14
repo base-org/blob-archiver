@@ -15,6 +15,11 @@ There are currently two supported storage options:
 You can control which storage backend is used by setting the `BLOB_API_DATA_STORE` and `BLOB_ARCHIVER_DATA_STORE` to 
 either `disk` or `s3`.
 
+### Data Validity
+Currently, the archiver and api do not validate the beacon node's data. Therefore, it's important to either trust the 
+Beacon node, or validate the data in the client. There is an open [issue](https://github.com/base-org/blob-archiver/issues/4) 
+to add data validation to the archiver and api.
+
 ### Development
 The `Makefile` contains a number of commands for development:
 
