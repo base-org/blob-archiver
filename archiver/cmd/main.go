@@ -66,7 +66,9 @@ func Main() cliapp.LifecycleAction {
 			return nil, err
 		}
 
+		api := service.NewAPI(m, l)
+
 		l.Info("Initializing Archiver Service")
-		return service.NewService(l, cfg, storageClient, beaconClient, m)
+		return service.NewService(l, cfg, api, storageClient, beaconClient, m)
 	}
 }
