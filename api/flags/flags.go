@@ -12,7 +12,7 @@ const EnvVarPrefix = "BLOB_API"
 
 var (
 	ListenAddressFlag = &cli.StringFlag{
-		Name:    "api-list-address",
+		Name:    "api-listen-address",
 		Usage:   "The address to list for new requests on",
 		EnvVars: opservice.PrefixEnvVar(EnvVarPrefix, "LISTEN_ADDRESS"),
 		Value:   "0.0.0.0:8000",

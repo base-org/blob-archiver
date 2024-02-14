@@ -19,9 +19,15 @@ var (
 	}
 	ArchiverOriginBlock = &cli.StringFlag{
 		Name:     "archiver-origin-block",
-		Usage:    "The lastest block hash that the archiver will walk back to",
+		Usage:    "The latest block hash that the archiver will walk back to",
 		Required: true,
 		EnvVars:  opservice.PrefixEnvVar(EnvVarPrefix, "ORIGIN_BLOCK"),
+	}
+	ArchiverListenAddrFlag = &cli.StringFlag{
+		Name:    "archiver-listen-address",
+		Usage:   "The address to list for new requests on",
+		EnvVars: opservice.PrefixEnvVar(EnvVarPrefix, "LISTEN_ADDRESS"),
+		Value:   "0.0.0.0:8000",
 	}
 )
 
@@ -31,7 +37,7 @@ func init() {
 	flags = append(flags, common.CLIFlags(EnvVarPrefix)...)
 	flags = append(flags, opmetrics.CLIFlags(EnvVarPrefix)...)
 	flags = append(flags, oplog.CLIFlags(EnvVarPrefix)...)
-	flags = append(flags, ArchiverPollIntervalFlag, ArchiverOriginBlock)
+	flags = append(flags, ArchiverPollIntervalFlag, ArchiverOriginBlock, ArchiverListenAddrFlag)
 
 	Flags = flags
 }

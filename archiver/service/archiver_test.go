@@ -21,10 +21,11 @@ func setup(t *testing.T, beacon *beacontest.StubBeaconClient) (*ArchiverService,
 	l := testlog.Logger(t, log.LvlInfo)
 	fs := storagetest.NewTestFileStorage(t, l)
 	m := metrics.NewMetrics()
+
 	svc, err := NewService(l, flags.ArchiverConfig{
 		PollInterval: 5 * time.Second,
 		OriginBlock:  blobtest.OriginBlock,
-	}, fs, beacon, m)
+	}, NewAPI(m, l), fs, beacon, m)
 	require.NoError(t, err)
 	return svc, fs
 }

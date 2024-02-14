@@ -18,6 +18,7 @@ type ArchiverConfig struct {
 	StorageConfig common.StorageConfig
 	PollInterval  time.Duration
 	OriginBlock   geth.Hash
+	ListenAddr    string
 }
 
 func (c ArchiverConfig) Check() error {
@@ -37,6 +38,10 @@ func (c ArchiverConfig) Check() error {
 		return fmt.Errorf("invalid origin block")
 	}
 
+	if c.ListenAddr == "" {
+		return fmt.Errorf("archiver listen address must be set")
+	}
+
 	return nil
 }
 
@@ -49,5 +54,6 @@ func ReadConfig(cliCtx *cli.Context) ArchiverConfig {
 		StorageConfig: common.NewStorageConfig(cliCtx),
 		PollInterval:  pollInterval,
 		OriginBlock:   geth.HexToHash(cliCtx.String(ArchiverOriginBlock.Name)),
+		ListenAddr:    cliCtx.String(ArchiverListenAddrFlag.Name),
 	}
 }

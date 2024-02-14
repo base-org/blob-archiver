@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -27,7 +28,7 @@ type BeaconClient interface {
 	client.BeaconBlockHeadersProvider
 }
 
-func NewService(l log.Logger, cfg flags.ArchiverConfig, dataStoreClient storage.DataStore, client BeaconClient, m metrics.Metricer) (*ArchiverService, error) {
+func NewService(l log.Logger, cfg flags.ArchiverConfig, api *API, dataStoreClient storage.DataStore, client BeaconClient, m metrics.Metricer) (*ArchiverService, error) {
 	return &ArchiverService{
 		log:             l,
 		cfg:             cfg,
@@ -35,6 +36,7 @@ func NewService(l log.Logger, cfg flags.ArchiverConfig, dataStoreClient storage.
 		metrics:         m,
 		stopCh:          make(chan struct{}),
 		beaconClient:    client,
+		api:             api,
 	}, nil
 }
 
@@ -47,6 +49,7 @@ type ArchiverService struct {
 	metricsServer   *httputil.HTTPServer
 	cfg             flags.ArchiverConfig
 	metrics         metrics.Metricer
+	api             *API
 }
 
 func (a *ArchiverService) Start(ctx context.Context) error {
@@ -60,6 +63,13 @@ func (a *ArchiverService) Start(ctx context.Context) error {
 		a.log.Info("started metrics server", "addr", srv.Addr())
 		a.metricsServer = srv
 	}
+
+	srv, err := httputil.StartHTTPServer(a.cfg.ListenAddr, a.api.router)
+	if err != nil {
+		return fmt.Errorf("failed to start Archiver API server: %w", err)
+	}
+
+	a.log.Info("Archiver API server started", "address", srv.Addr().String())
 
 	currentBlob, _, err := a.persistBlobsForBlockToS3(ctx, "head")
 	if err != nil {
