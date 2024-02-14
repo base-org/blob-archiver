@@ -62,7 +62,7 @@ func (a *APIService) Stop(ctx context.Context) error {
 	if a.stopped.Load() {
 		return ErrAlreadyStopped
 	}
-	a.log.Info("Stopping Archiver")
+	a.log.Info("Stopping API")
 	a.stopped.Store(true)
 
 	if a.apiServer != nil {
