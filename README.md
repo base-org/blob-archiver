@@ -1,6 +1,6 @@
 # Blob Archiver
-The Blob Archiver is a service to archive and query all historical blobs from the beacon chain. It consistens of two
-components:
+The Blob Archiver is a service to archive and allow querying of all historical blobs from the beacon chain. It consists 
+of two components:
 
 * **Archiver** - Tracks the beacon chain and writes blobs to a storage backend
 * **API** - Implements the blob sidecars [API](https://ethereum.github.io/beacon-APIs/#/Beacon/getBlobSidecars), which 

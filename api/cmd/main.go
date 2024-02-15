@@ -57,12 +57,12 @@ func Main() cliapp.LifecycleAction {
 
 		storageClient, err := storage.NewStorage(cfg.StorageConfig, l)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to initialize storage: %w", err)
 		}
 
 		beaconClient, err := beacon.NewBeaconClient(context.Background(), cfg.BeaconConfig)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to initialize beacon client: %w", err)
 		}
 
 		l.Info("Initializing API Service")

@@ -22,8 +22,10 @@ type Metricer interface {
 }
 
 type metricsRecorder struct {
-	inputType *prometheus.CounterVec
-	registry  *prometheus.Registry
+	// blockIdType records the type of block id used to request a block. This could be a hash (BlockIdTypeHash), or a
+	// beacon block identifier (BlockIdTypeBeacon).
+	blockIdType *prometheus.CounterVec
+	registry    *prometheus.Registry
 }
 
 func NewMetrics() Metricer {
@@ -31,7 +33,7 @@ func NewMetrics() Metricer {
 	factory := metrics.With(registry)
 	return &metricsRecorder{
 		registry: registry,
-		inputType: factory.NewCounterVec(prometheus.CounterOpts{
+		blockIdType: factory.NewCounterVec(prometheus.CounterOpts{
 			Namespace: MetricsNamespace,
 			Name:      "block_id_type",
 			Help:      "The type of block id used to request a block",
@@ -40,7 +42,7 @@ func NewMetrics() Metricer {
 }
 
 func (m *metricsRecorder) RecordBlockIdType(t BlockIdType) {
-	m.inputType.WithLabelValues(string(t)).Inc()
+	m.blockIdType.WithLabelValues(string(t)).Inc()
 }
 
 func (m *metricsRecorder) Registry() *prometheus.Registry {

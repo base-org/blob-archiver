@@ -20,14 +20,10 @@ var (
 )
 
 func init() {
-	var flags []cli.Flag
-
-	flags = append(flags, common.CLIFlags(EnvVarPrefix)...)
-	flags = append(flags, opmetrics.CLIFlags(EnvVarPrefix)...)
-	flags = append(flags, oplog.CLIFlags(EnvVarPrefix)...)
-	flags = append(flags, ListenAddressFlag)
-
-	Flags = flags
+	Flags = append(Flags, common.CLIFlags(EnvVarPrefix)...)
+	Flags = append(Flags, opmetrics.CLIFlags(EnvVarPrefix)...)
+	Flags = append(Flags, oplog.CLIFlags(EnvVarPrefix)...)
+	Flags = append(Flags, ListenAddressFlag)
 }
 
 // Flags contains the list of configuration options available to the binary.

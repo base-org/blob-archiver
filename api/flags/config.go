@@ -20,11 +20,11 @@ type APIConfig struct {
 
 func (c APIConfig) Check() error {
 	if err := c.StorageConfig.Check(); err != nil {
-		return err
+		return fmt.Errorf("storage config check failed: %w", err)
 	}
 
 	if err := c.BeaconConfig.Check(); err != nil {
-		return err
+		return fmt.Errorf("beacon config check failed: %w", err)
 	}
 
 	if c.ListenAddr == "" {

@@ -133,11 +133,8 @@ func (a *API) toBeaconBlockHash(id string) (common.Hash, *httpError) {
 
 		if err != nil {
 			var apiErr *api.Error
-			if errors.As(err, &apiErr) {
-				switch apiErr.StatusCode {
-				case 404:
-					return common.Hash{}, errUnknownBlock
-				}
+			if errors.As(err, &apiErr) && apiErr.StatusCode == 404 {
+				return common.Hash{}, errUnknownBlock
 			}
 
 			return common.Hash{}, errServerError
@@ -208,7 +205,7 @@ func (a *API) blobSidecarHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // filterBlobs filters the blobs based on the indices query provided.
-// If no indices or invalid indices are provided, the original blobs are returned.
+// If no indices are provided, all blobs are returned. If invalid indices are provided, an error is returned.
 func filterBlobs(blobs []*deneb.BlobSidecar, indices string) ([]*deneb.BlobSidecar, *httpError) {
 	if indices == "" {
 		return blobs, nil
