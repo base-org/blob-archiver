@@ -171,12 +171,28 @@ func TestAPIService(t *testing.T) {
 			},
 		},
 		{
-			name:   "indices out of bounds returns empty array",
-			path:   "/eth/v1/beacon/blob_sidecars/1234?indices=3",
-			status: 200,
-			expected: &storage.BlobSidecars{
-				Data: []*deneb.BlobSidecar{},
-			},
+			name:       "only index out of bounds returns empty array",
+			path:       "/eth/v1/beacon/blob_sidecars/1234?indices=3",
+			status:     400,
+			errMessage: "invalid index: 3 block contains 2 blobs",
+		},
+		{
+			name:       "any index out of bounds returns error",
+			path:       "/eth/v1/beacon/blob_sidecars/1234?indices=1,10",
+			status:     400,
+			errMessage: "invalid index: 10 block contains 2 blobs",
+		},
+		{
+			name:       "only index out of bounds (boundary condition) returns error",
+			path:       "/eth/v1/beacon/blob_sidecars/1234?indices=2",
+			status:     400,
+			errMessage: "invalid index: 2 block contains 2 blobs",
+		},
+		{
+			name:       "negative index returns error",
+			path:       "/eth/v1/beacon/blob_sidecars/1234?indices=-2",
+			status:     400,
+			errMessage: "invalid index input: -2",
 		},
 		{
 			name:       "no 0x on hash",

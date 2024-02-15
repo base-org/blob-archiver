@@ -68,6 +68,13 @@ func newIndicesError(input string) *httpError {
 	}
 }
 
+func newOutOfRangeError(input uint64, blobCount int) *httpError {
+	return &httpError{
+		Code:    http.StatusBadRequest,
+		Message: fmt.Sprintf("invalid index: %d block contains %d blobs", input, blobCount),
+	}
+}
+
 type API struct {
 	dataStoreClient storage.DataStoreReader
 	beaconClient    client.BeaconBlockHeadersProvider
@@ -222,6 +229,11 @@ func filterBlobs(blobs []*deneb.BlobSidecar, indices string) ([]*deneb.BlobSidec
 		if err != nil {
 			return nil, newIndicesError(index)
 		}
+
+		if parsedInt >= uint64(len(blobs)) {
+			return nil, newOutOfRangeError(parsedInt, len(blobs))
+		}
+
 		blobIndex := deneb.BlobIndex(parsedInt)
 		indicesMap[blobIndex] = struct{}{}
 	}
