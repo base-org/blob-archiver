@@ -111,5 +111,5 @@ func TestReadInvalidData(t *testing.T) {
 
 	_, err = fs.Read(context.Background(), id)
 	require.Error(t, err)
-	require.True(t, errors.Is(err, ErrEncoding))
+	require.True(t, errors.Is(err, ErrMarshaling))
 }

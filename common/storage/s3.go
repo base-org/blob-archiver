@@ -79,7 +79,7 @@ func (s *S3Storage) Read(ctx context.Context, hash common.Hash) (BlobData, error
 	err = json.NewDecoder(res).Decode(&data)
 	if err != nil {
 		s.log.Warn("error decoding blob", "hash", hash.String(), "err", err)
-		return BlobData{}, ErrEncoding
+		return BlobData{}, ErrMarshaling
 	}
 
 	return data, nil
@@ -89,7 +89,7 @@ func (s *S3Storage) Write(ctx context.Context, data BlobData) error {
 	b, err := json.Marshal(data)
 	if err != nil {
 		s.log.Warn("error encoding blob", "err", err)
-		return ErrEncoding
+		return ErrMarshaling
 	}
 
 	reader := bytes.NewReader(b)

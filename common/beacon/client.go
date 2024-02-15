@@ -19,7 +19,7 @@ func NewBeaconClient(ctx context.Context, cfg flags.BeaconConfig) (Client, error
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	c, err := http.New(cctx, http.WithAddress(cfg.BeaconUrl), http.WithTimeout(cfg.BeaconClientTimeout))
+	c, err := http.New(cctx, http.WithAddress(cfg.BeaconURL), http.WithTimeout(cfg.BeaconClientTimeout))
 	if err != nil {
 		return nil, err
 	}

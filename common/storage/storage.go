@@ -19,8 +19,8 @@ var (
 	ErrNotFound = errors.New("blob not found")
 	// ErrStorage is returned when there is an error accessing the storage.
 	ErrStorage = errors.New("error accessing storage")
-	// ErrEncoding is returned when there is an error in blob encoding or decoding.
-	ErrEncoding = errors.New("error encoding/decoding blob")
+	// ErrMarshaling is returned when there is an error in (un)marshaling the blob
+	ErrMarshaling = errors.New("error encoding/decoding blob")
 )
 
 type Header struct {
@@ -72,7 +72,7 @@ type DataStoreReader interface {
 	// - nil: reading the blob was successful. The blob data is also returned.
 	// - ErrNotFound: the blob data was not found in the data store.
 	// - ErrStorage: there was an error accessing the data store.
-	// - ErrEncoding: there was an error decoding the blob data.
+	// - ErrMarshaling: there was an error decoding the blob data.
 	Read(ctx context.Context, hash common.Hash) (BlobData, error)
 }
 
@@ -81,7 +81,7 @@ type DataStoreWriter interface {
 	// Write writes the given blob data to the data store. It should return one of the following errors:
 	// - nil: writing the blob was successful.
 	// - ErrStorage: there was an error accessing the data store.
-	// - ErrEncoding: there was an error encoding the blob data.
+	// - ErrMarshaling: there was an error encoding the blob data.
 	Write(ctx context.Context, data BlobData) error
 }
 

@@ -2,6 +2,7 @@ package flags
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/urfave/cli/v2"
@@ -56,7 +57,7 @@ func (c S3Config) check() error {
 }
 
 type BeaconConfig struct {
-	BeaconUrl           string
+	BeaconURL           string
 	BeaconClientTimeout time.Duration
 }
 
@@ -70,7 +71,7 @@ func NewBeaconConfig(cliCtx *cli.Context) BeaconConfig {
 	timeout, _ := time.ParseDuration(cliCtx.String(BeaconHttpClientTimeoutFlagName))
 
 	return BeaconConfig{
-		BeaconUrl:           cliCtx.String(BeaconHttpFlagName),
+		BeaconURL:           cliCtx.String(BeaconHttpFlagName),
 		BeaconClientTimeout: timeout,
 	}
 }
@@ -116,7 +117,7 @@ func toS3CredentialType(s string) S3CredentialType {
 }
 
 func (c BeaconConfig) Check() error {
-	if c.BeaconUrl == "" {
+	if c.BeaconURL == "" {
 		return errors.New("beacon url must be set")
 	}
 
@@ -134,7 +135,7 @@ func (c StorageConfig) Check() error {
 
 	if c.DataStorageType == DataStorageS3 {
 		if err := c.S3Config.check(); err != nil {
-			return err
+			return fmt.Errorf("s3 config check failed: %w", err)
 		}
 	} else if c.DataStorageType == DataStorageFile && c.FileStorageDirectory == "" {
 		return errors.New("file storage directory must be set")

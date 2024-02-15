@@ -46,7 +46,7 @@ func (s *FileStorage) Read(_ context.Context, hash common.Hash) (BlobData, error
 	err = json.Unmarshal(data, &result)
 	if err != nil {
 		s.log.Warn("error decoding blob", "err", err, "hash", hash.String())
-		return BlobData{}, ErrEncoding
+		return BlobData{}, ErrMarshaling
 	}
 	return result, nil
 }
@@ -55,7 +55,7 @@ func (s *FileStorage) Write(_ context.Context, data BlobData) error {
 	b, err := json.Marshal(data)
 	if err != nil {
 		s.log.Warn("error encoding blob", "err", err)
-		return ErrEncoding
+		return ErrMarshaling
 	}
 	err = os.WriteFile(s.fileName(data.Header.BeaconBlockHash), b, 0644)
 	if err != nil {
