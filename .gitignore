@@ -1,0 +1,6 @@
+.idea/
+.DS_Store
+.swp
+.env
+api/bin
+archiver/bin
