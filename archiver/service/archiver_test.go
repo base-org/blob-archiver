@@ -249,3 +249,57 @@ func TestArchiver_LatestStopsAtOrigin(t *testing.T) {
 		require.Equal(t, data.BlobSidecars.Data, beacon.Blobs[hash.String()])
 	}
 }
+
+func TestArchiver_LatestRetriesOnFailure(t *testing.T) {
+	beacon := beacontest.NewDefaultStubBeaconClient(t)
+	svc, fs := setup(t, beacon)
+
+	// 5 is the current head, if three already exists, we should write 5 and 4 and stop at three
+	fs.WriteOrFail(t, storage.BlobData{
+		Header: storage.Header{
+			BeaconBlockHash: blobtest.Three,
+		},
+		BlobSidecars: storage.BlobSidecars{
+			Data: beacon.Blobs[blobtest.Three.String()],
+		},
+	})
+
+	fs.CheckNotExistsOrFail(t, blobtest.Five)
+	fs.CheckNotExistsOrFail(t, blobtest.Four)
+	fs.CheckExistsOrFail(t, blobtest.Three)
+
+	// One failure is retried
+	fs.WritesFailTimes(1)
+	svc.processBlocksUntilKnownBlock(context.Background())
+
+	fs.CheckExistsOrFail(t, blobtest.Five)
+	fs.CheckExistsOrFail(t, blobtest.Four)
+	fs.CheckExistsOrFail(t, blobtest.Three)
+}
+
+func TestArchiver_LatestHaltsOnPersistentError(t *testing.T) {
+	beacon := beacontest.NewDefaultStubBeaconClient(t)
+	svc, fs := setup(t, beacon)
+
+	// 5 is the current head, if three already exists, we should write 5 and 4 and stop at three
+	fs.WriteOrFail(t, storage.BlobData{
+		Header: storage.Header{
+			BeaconBlockHash: blobtest.Three,
+		},
+		BlobSidecars: storage.BlobSidecars{
+			Data: beacon.Blobs[blobtest.Three.String()],
+		},
+	})
+
+	fs.CheckNotExistsOrFail(t, blobtest.Five)
+	fs.CheckNotExistsOrFail(t, blobtest.Four)
+	fs.CheckExistsOrFail(t, blobtest.Three)
+
+	// One failure is retried
+	fs.WritesFailTimes(maxLiveAttempts + 1)
+	svc.processBlocksUntilKnownBlock(context.Background())
+
+	fs.CheckNotExistsOrFail(t, blobtest.Five)
+	fs.CheckNotExistsOrFail(t, blobtest.Four)
+	fs.CheckExistsOrFail(t, blobtest.Three)
+}

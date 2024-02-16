@@ -15,10 +15,12 @@ import (
 	"github.com/base-org/blob-archiver/common/storage"
 	"github.com/ethereum-optimism/optimism/op-service/httputil"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
+	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
 
+const maxLiveAttempts = 10
 const backfillErrorRetryInterval = 5 * time.Second
 
 var ErrAlreadyStopped = errors.New("already stopped")
@@ -223,7 +225,9 @@ func (a *ArchiverService) processBlocksUntilKnownBlock(ctx context.Context) {
 	currentBlockId := "head"
 
 	for {
-		current, alreadyExisted, err := a.persistBlobsForBlockToS3(ctx, currentBlockId)
+		current, alreadyExisted, err := retry.Do2(ctx, maxLiveAttempts, retry.Exponential(), func() (*v1.BeaconBlockHeader, bool, error) {
+			return a.persistBlobsForBlockToS3(ctx, currentBlockId)
+		})
 
 		if err != nil {
 			a.log.Error("failed to update live blobs for block", "err", err, "blockId", currentBlockId)
