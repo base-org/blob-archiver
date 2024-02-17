@@ -20,7 +20,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-const maxLiveAttempts = 10
+const liveFetchBlobMaximumRetries = 10
+const startupFetchBlobMaximumRetries = 3
 const backfillErrorRetryInterval = 5 * time.Second
 
 var ErrAlreadyStopped = errors.New("already stopped")
@@ -77,7 +78,10 @@ func (a *ArchiverService) Start(ctx context.Context) error {
 
 	a.log.Info("Archiver API server started", "address", srv.Addr().String())
 
-	currentBlob, _, err := a.persistBlobsForBlockToS3(ctx, "head")
+	currentBlob, _, err := retry.Do2(ctx, startupFetchBlobMaximumRetries, retry.Exponential(), func() (*v1.BeaconBlockHeader, bool, error) {
+		return a.persistBlobsForBlockToS3(ctx, "head")
+	})
+
 	if err != nil {
 		a.log.Error("failed to seed archiver with initial block", "err", err)
 		return err
@@ -225,7 +229,7 @@ func (a *ArchiverService) processBlocksUntilKnownBlock(ctx context.Context) {
 	currentBlockId := "head"
 
 	for {
-		current, alreadyExisted, err := retry.Do2(ctx, maxLiveAttempts, retry.Exponential(), func() (*v1.BeaconBlockHeader, bool, error) {
+		current, alreadyExisted, err := retry.Do2(ctx, liveFetchBlobMaximumRetries, retry.Exponential(), func() (*v1.BeaconBlockHeader, bool, error) {
 			return a.persistBlobsForBlockToS3(ctx, currentBlockId)
 		})
 

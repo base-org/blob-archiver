@@ -295,8 +295,8 @@ func TestArchiver_LatestHaltsOnPersistentError(t *testing.T) {
 	fs.CheckNotExistsOrFail(t, blobtest.Four)
 	fs.CheckExistsOrFail(t, blobtest.Three)
 
-	// One failure is retried
-	fs.WritesFailTimes(maxLiveAttempts + 1)
+	// Retries the maximum number of times, then fails and will not write the blobs
+	fs.WritesFailTimes(liveFetchBlobMaximumRetries + 1)
 	svc.processBlocksUntilKnownBlock(context.Background())
 
 	fs.CheckNotExistsOrFail(t, blobtest.Five)
