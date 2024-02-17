@@ -66,9 +66,14 @@ func Main() cliapp.LifecycleAction {
 			return nil, err
 		}
 
-		api := service.NewAPI(m, l)
-
 		l.Info("Initializing Archiver Service")
-		return service.NewService(l, cfg, api, storageClient, beaconClient, m)
+		archiver, err := service.NewArchiver(l, cfg, storageClient, beaconClient, m)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize archiver: %w", err)
+		}
+
+		api := service.NewAPI(m, l, archiver)
+
+		return service.NewService(l, cfg, api, archiver, m)
 	}
 }
