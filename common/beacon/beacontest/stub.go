@@ -59,8 +59,14 @@ func NewDefaultStubBeaconClient(t *testing.T) *StubBeaconClient {
 		}
 	}
 
-	headBlobs := blobtest.NewBlobSidecars(t, 6)
-	finalizedBlobs := blobtest.NewBlobSidecars(t, 4)
+	startSlot := blobtest.StartSlot
+
+	originBlobs := blobtest.NewBlobSidecars(t, 1)
+	oneBlobs := blobtest.NewBlobSidecars(t, 2)
+	twoBlobs := blobtest.NewBlobSidecars(t, 0)
+	threeBlobs := blobtest.NewBlobSidecars(t, 4)
+	fourBlobs := blobtest.NewBlobSidecars(t, 5)
+	fiveBlobs := blobtest.NewBlobSidecars(t, 6)
 
 	startSlot := blobtest.StartSlot
 
@@ -87,14 +93,25 @@ func NewDefaultStubBeaconClient(t *testing.T) *StubBeaconClient {
 			strconv.FormatUint(startSlot+5, 10): makeHeader(startSlot+5, blobtest.Five, blobtest.Four),
 		},
 		Blobs: map[string][]*deneb.BlobSidecar{
-			blobtest.OriginBlock.String(): blobtest.NewBlobSidecars(t, 1),
-			blobtest.One.String():         blobtest.NewBlobSidecars(t, 2),
-			blobtest.Two.String():         blobtest.NewBlobSidecars(t, 0),
-			blobtest.Three.String():       finalizedBlobs,
-			blobtest.Four.String():        blobtest.NewBlobSidecars(t, 5),
-			blobtest.Five.String():        headBlobs,
-			"head":                        headBlobs,
-			"finalized":                   finalizedBlobs,
+			// Lookup by hash
+			blobtest.OriginBlock.String(): originBlobs,
+			blobtest.One.String():         oneBlobs,
+			blobtest.Two.String():         twoBlobs,
+			blobtest.Three.String():       threeBlobs,
+			blobtest.Four.String():        fourBlobs,
+			blobtest.Five.String():        fiveBlobs,
+
+			// Lookup by identifier
+			"head":      fiveBlobs,
+			"finalized": threeBlobs,
+
+			// Lookup by slot
+			strconv.FormatUint(startSlot, 10):   originBlobs,
+			strconv.FormatUint(startSlot+1, 10): oneBlobs,
+			strconv.FormatUint(startSlot+2, 10): twoBlobs,
+			strconv.FormatUint(startSlot+3, 10): threeBlobs,
+			strconv.FormatUint(startSlot+4, 10): fourBlobs,
+			strconv.FormatUint(startSlot+5, 10): fiveBlobs,
 		},
 	}
 }

@@ -1,6 +1,7 @@
 build:
 	make -C ./archiver blob-archiver
 	make -C ./api blob-api
+	make -C ./validator blob-validator
 .PHONY: build
 
 build-docker:
@@ -10,11 +11,13 @@ build-docker:
 clean:
 	make -C ./archiver clean
 	make -C ./api clean
+	make -C ./validator clean
 .PHONY: clean
 
 test:
 	make -C ./archiver test
 	make -C ./api test
+	make -C ./validator test
 .PHONY: test
 
 integration:
