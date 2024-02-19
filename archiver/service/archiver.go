@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"time"
 
@@ -47,7 +48,7 @@ type Archiver struct {
 // to the previously stored blocks. This ensures that during restarts or outages of an archiver, any gaps will be
 // filled in.
 func (a *Archiver) Start(ctx context.Context) error {
-	currentBlob, _, err := retry.Do2(ctx, startupFetchBlobMaximumRetries, retry.Exponential(), func() (*v1.BeaconBlockHeader, bool, error) {
+	_, _, err := retry.Do2(ctx, startupFetchBlobMaximumRetries, retry.Exponential(), func() (*v1.BeaconBlockHeader, bool, error) {
 		return a.persistBlobsForBlockToS3(ctx, "head", false)
 	})
 
@@ -56,7 +57,7 @@ func (a *Archiver) Start(ctx context.Context) error {
 		return err
 	}
 
-	go a.backfillBlobs(ctx, currentBlob)
+	//go a.backfillBlobs(ctx, currentBlob)
 
 	return a.trackLatestBlocks(ctx)
 }
@@ -211,14 +212,32 @@ func (a *Archiver) rearchiveRange(from uint64, to uint64) (uint64, uint64, error
 	for i := from; i <= to; i++ {
 		id := strconv.FormatUint(i, 10)
 
-		a.log.Debug("rearchiving block", "blockId", id)
+		l := a.log.New("slot", id)
 
-		_, _, err := retry.Do2(context.Background(), rearchiveMaximumRetries, retry.Exponential(), func() (*v1.BeaconBlockHeader, bool, error) {
-			return a.persistBlobsForBlockToS3(context.Background(), id, true)
+		l.Info("rearchiving block")
+
+		reindexed, err := retry.Do(context.Background(), rearchiveMaximumRetries, retry.Exponential(), func() (bool, error) {
+			_, _, e := a.persistBlobsForBlockToS3(context.Background(), id, true)
+
+			// If the block is not found, we can assume that the slot has been skipped
+			if e != nil {
+				var apiErr *api.Error
+				if errors.As(e, &apiErr) && apiErr.StatusCode == 404 {
+					return false, nil
+				}
+
+				return false, e
+			}
+
+			return true, nil
 		})
 
 		if err != nil {
 			return from, i, err
+		}
+
+		if !reindexed {
+			l.Info("block not found during reindexing", "slot", id)
 		}
 
 		a.metrics.RecordProcessedBlock(metrics.BlockSourceRearchive)
