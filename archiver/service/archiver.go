@@ -43,12 +43,12 @@ type Archiver struct {
 	stopCh          chan struct{}
 }
 
-// Start starts the archiver service. It begins polling the beacon node for the latest blocks and persisting blobs for
+// Start starts archiving blobs. It begins polling the beacon node for the latest blocks and persisting blobs for
 // them. Concurrently it'll also begin a backfill process (see backfillBlobs) to store all blobs from the current head
 // to the previously stored blocks. This ensures that during restarts or outages of an archiver, any gaps will be
 // filled in.
 func (a *Archiver) Start(ctx context.Context) error {
-	_, _, err := retry.Do2(ctx, startupFetchBlobMaximumRetries, retry.Exponential(), func() (*v1.BeaconBlockHeader, bool, error) {
+	currentBlock, _, err := retry.Do2(ctx, startupFetchBlobMaximumRetries, retry.Exponential(), func() (*v1.BeaconBlockHeader, bool, error) {
 		return a.persistBlobsForBlockToS3(ctx, "head", false)
 	})
 
@@ -57,7 +57,7 @@ func (a *Archiver) Start(ctx context.Context) error {
 		return err
 	}
 
-	//go a.backfillBlobs(ctx, currentBlob)
+	go a.backfillBlobs(ctx, currentBlock)
 
 	return a.trackLatestBlocks(ctx)
 }
@@ -216,7 +216,7 @@ func (a *Archiver) rearchiveRange(from uint64, to uint64) (uint64, uint64, error
 
 		l.Info("rearchiving block")
 
-		reindexed, err := retry.Do(context.Background(), rearchiveMaximumRetries, retry.Exponential(), func() (bool, error) {
+		rewritten, err := retry.Do(context.Background(), rearchiveMaximumRetries, retry.Exponential(), func() (bool, error) {
 			_, _, e := a.persistBlobsForBlockToS3(context.Background(), id, true)
 
 			// If the block is not found, we can assume that the slot has been skipped
@@ -236,8 +236,8 @@ func (a *Archiver) rearchiveRange(from uint64, to uint64) (uint64, uint64, error
 			return from, i, err
 		}
 
-		if !reindexed {
-			l.Info("block not found during reindexing", "slot", id)
+		if !rewritten {
+			l.Info("block not found during reachiving", "slot", id)
 		}
 
 		a.metrics.RecordProcessedBlock(metrics.BlockSourceRearchive)

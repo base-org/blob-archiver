@@ -46,12 +46,12 @@ func NewAPI(metrics m.Metricer, logger log.Logger, archiver *Archiver) *API {
 	})
 
 	r.Get("/", http.NotFound)
-	r.Post("/reindex", result.reindexBlocks)
+	r.Post("/rearchive", result.rearchiveBlocks)
 
 	return result
 }
 
-type reindexResponse struct {
+type rearchiveResponse struct {
 	Error      string `json:"error,omitempty"`
 	BlockStart uint64 `json:"blockStart"`
 	BlockEnd   uint64 `json:"blockEnd"`
@@ -68,11 +68,13 @@ func toSlot(input string) (uint64, error) {
 	return res, nil
 }
 
-func (a *API) reindexBlocks(w http.ResponseWriter, r *http.Request) {
+// rearchiveBlocks rearchives blobs from blocks between the given from and to slots.
+// If any blocks are already archived, they will be overwritten with data from the beacon node.
+func (a *API) rearchiveBlocks(w http.ResponseWriter, r *http.Request) {
 	from, err := toSlot(r.URL.Query().Get("from"))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(reindexResponse{
+		_ = json.NewEncoder(w).Encode(rearchiveResponse{
 			Error: fmt.Sprintf("invalid from param: %v", err),
 		})
 		return
@@ -81,7 +83,7 @@ func (a *API) reindexBlocks(w http.ResponseWriter, r *http.Request) {
 	to, err := toSlot(r.URL.Query().Get("to"))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(reindexResponse{
+		_ = json.NewEncoder(w).Encode(rearchiveResponse{
 			Error: fmt.Sprintf("invalid to param: %v", err),
 		})
 		return
@@ -89,7 +91,7 @@ func (a *API) reindexBlocks(w http.ResponseWriter, r *http.Request) {
 
 	if from > to {
 		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(reindexResponse{
+		_ = json.NewEncoder(w).Encode(rearchiveResponse{
 			Error: fmt.Sprintf("invalid range: from %d to %d", from, to),
 		})
 		return
@@ -97,19 +99,19 @@ func (a *API) reindexBlocks(w http.ResponseWriter, r *http.Request) {
 
 	blockStart, blockEnd, err := a.archiver.rearchiveRange(from, to)
 	if err != nil {
-		a.logger.Error("Failed to reindex blocks", "err", err)
+		a.logger.Error("Failed to rearchive blocks", "err", err)
 
 		w.WriteHeader(http.StatusInternalServerError)
-		err = json.NewEncoder(w).Encode(reindexResponse{
+		err = json.NewEncoder(w).Encode(rearchiveResponse{
 			Error:      err.Error(),
 			BlockStart: blockStart,
 			BlockEnd:   blockEnd,
 		})
 	} else {
-		a.logger.Info("Reindexing blocks complete")
+		a.logger.Info("Rearchiving blocks complete")
 		w.WriteHeader(http.StatusOK)
 
-		err = json.NewEncoder(w).Encode(reindexResponse{
+		err = json.NewEncoder(w).Encode(rearchiveResponse{
 			BlockStart: blockStart,
 			BlockEnd:   blockEnd,
 		})

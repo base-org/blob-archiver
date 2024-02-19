@@ -36,7 +36,7 @@ func TestHealthHandler(t *testing.T) {
 	require.Equal(t, 200, response.Code)
 }
 
-func TestReindexHandler(t *testing.T) {
+func TestRearchiveHandler(t *testing.T) {
 	a, _ := setupAPI(t)
 
 	tests := []struct {
@@ -47,37 +47,37 @@ func TestReindexHandler(t *testing.T) {
 	}{
 		{
 			name:           "should fail with no params",
-			path:           "/reindex",
+			path:           "/rearchive",
 			expectedStatus: 400,
 			error:          "invalid from param: must provide param",
 		},
 		{
 			name:           "should fail with missing to param",
-			path:           "/reindex?from=1",
+			path:           "/rearchive?from=1",
 			expectedStatus: 400,
 			error:          "invalid to param: must provide param",
 		},
 		{
 			name:           "should fail with missing from param",
-			path:           "/reindex?to=1",
+			path:           "/rearchive?to=1",
 			expectedStatus: 400,
 			error:          "invalid from param: must provide param",
 		},
 		{
 			name:           "should fail with invalid from param",
-			path:           "/reindex?from=blah&to=1",
+			path:           "/rearchive?from=blah&to=1",
 			expectedStatus: 400,
 			error:          "invalid from param: invalid slot: \"blah\"",
 		},
 		{
 			name:           "should fail with invalid to param",
-			path:           "/reindex?from=1&to=blah",
+			path:           "/rearchive?from=1&to=blah",
 			expectedStatus: 400,
 			error:          "invalid to param: invalid slot: \"blah\"",
 		},
 		{
 			name:           "should fail with to greater than equal to from",
-			path:           "/reindex?from=2&to=1",
+			path:           "/rearchive?from=2&to=1",
 			expectedStatus: 400,
 			error:          "invalid range: from 2 to 1",
 		},
@@ -93,7 +93,7 @@ func TestReindexHandler(t *testing.T) {
 
 			require.Equal(t, test.expectedStatus, response.Code)
 
-			var errResponse reindexResponse
+			var errResponse rearchiveResponse
 			err := json.NewDecoder(response.Body).Decode(&errResponse)
 			require.NoError(t, err)
 

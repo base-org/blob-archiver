@@ -41,10 +41,7 @@ type ArchiverService struct {
 	archiver      *Archiver
 }
 
-// Start starts the archiver service. It begins polling the beacon node for the latest blocks and persisting blobs for
-// them. Concurrently it'll also begin a backfill process (see backfillBlobs) to store all blobs from the current head
-// to the previously stored blocks. This ensures that during restarts or outages of an archiver, any gaps will be
-// filled in.
+// Start starts the archiver service. It'll start the API's as well as the archiving process.
 func (a *ArchiverService) Start(ctx context.Context) error {
 	if a.cfg.MetricsConfig.Enabled {
 		a.log.Info("starting metrics server", "addr", a.cfg.MetricsConfig.ListenAddr, "port", a.cfg.MetricsConfig.ListenPort)
