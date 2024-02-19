@@ -12,6 +12,7 @@ import (
 
 type TestFileStorage struct {
 	*storage.FileStorage
+	writeFailCount int
 }
 
 func NewTestFileStorage(t *testing.T, l log.Logger) *TestFileStorage {
@@ -19,6 +20,19 @@ func NewTestFileStorage(t *testing.T, l log.Logger) *TestFileStorage {
 	return &TestFileStorage{
 		FileStorage: storage.NewFileStorage(dir, l),
 	}
+}
+
+func (s *TestFileStorage) WritesFailTimes(times int) {
+	s.writeFailCount = times
+}
+
+func (s *TestFileStorage) Write(_ context.Context, data storage.BlobData) error {
+	if s.writeFailCount > 0 {
+		s.writeFailCount--
+		return storage.ErrStorage
+	}
+
+	return s.FileStorage.Write(context.Background(), data)
 }
 
 func (fs *TestFileStorage) CheckExistsOrFail(t *testing.T, hash common.Hash) {

@@ -15,10 +15,13 @@ import (
 	"github.com/base-org/blob-archiver/common/storage"
 	"github.com/ethereum-optimism/optimism/op-service/httputil"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
+	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
 
+const liveFetchBlobMaximumRetries = 10
+const startupFetchBlobMaximumRetries = 3
 const backfillErrorRetryInterval = 5 * time.Second
 
 var ErrAlreadyStopped = errors.New("already stopped")
@@ -75,7 +78,10 @@ func (a *ArchiverService) Start(ctx context.Context) error {
 
 	a.log.Info("Archiver API server started", "address", srv.Addr().String())
 
-	currentBlob, _, err := a.persistBlobsForBlockToS3(ctx, "head")
+	currentBlob, _, err := retry.Do2(ctx, startupFetchBlobMaximumRetries, retry.Exponential(), func() (*v1.BeaconBlockHeader, bool, error) {
+		return a.persistBlobsForBlockToS3(ctx, "head")
+	})
+
 	if err != nil {
 		a.log.Error("failed to seed archiver with initial block", "err", err)
 		return err
@@ -223,7 +229,9 @@ func (a *ArchiverService) processBlocksUntilKnownBlock(ctx context.Context) {
 	currentBlockId := "head"
 
 	for {
-		current, alreadyExisted, err := a.persistBlobsForBlockToS3(ctx, currentBlockId)
+		current, alreadyExisted, err := retry.Do2(ctx, liveFetchBlobMaximumRetries, retry.Exponential(), func() (*v1.BeaconBlockHeader, bool, error) {
+			return a.persistBlobsForBlockToS3(ctx, currentBlockId)
+		})
 
 		if err != nil {
 			a.log.Error("failed to update live blobs for block", "err", err, "blockId", currentBlockId)
