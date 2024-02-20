@@ -4,3 +4,4 @@
 .env
 api/bin
 archiver/bin
+validator/bin
