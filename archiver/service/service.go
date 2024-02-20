@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	client "github.com/attestantio/go-eth2-client"
 	"github.com/base-org/blob-archiver/archiver/flags"
 	"github.com/base-org/blob-archiver/archiver/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/httputil"
@@ -15,11 +14,6 @@ import (
 )
 
 var ErrAlreadyStopped = errors.New("already stopped")
-
-type BeaconClient interface {
-	client.BlobSidecarsProvider
-	client.BeaconBlockHeadersProvider
-}
 
 func NewService(l log.Logger, cfg flags.ArchiverConfig, api *API, archiver *Archiver, m metrics.Metricer) (*ArchiverService, error) {
 	return &ArchiverService{

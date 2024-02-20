@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	client "github.com/attestantio/go-eth2-client"
 	"github.com/attestantio/go-eth2-client/api"
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/base-org/blob-archiver/archiver/flags"
@@ -22,6 +23,11 @@ const (
 	rearchiveMaximumRetries        = 3
 	backfillErrorRetryInterval     = 5 * time.Second
 )
+
+type BeaconClient interface {
+	client.BlobSidecarsProvider
+	client.BeaconBlockHeadersProvider
+}
 
 func NewArchiver(l log.Logger, cfg flags.ArchiverConfig, dataStoreClient storage.DataStore, client BeaconClient, m metrics.Metricer) (*Archiver, error) {
 	return &Archiver{
@@ -208,6 +214,9 @@ func (a *Archiver) processBlocksUntilKnownBlock(ctx context.Context) {
 	a.log.Info("live data refreshed", "startHash", start.Root.String(), "endHash", currentBlockId)
 }
 
+// rearchiveRange will rearchive all blocks in the range from the given start to end. It returns the start and end of the
+// range that was successfully rearchived. On any persistent errors, it will halt archiving and return the range of blocks
+// that were rearchived and the error that halted the process.
 func (a *Archiver) rearchiveRange(from uint64, to uint64) (uint64, uint64, error) {
 	for i := from; i <= to; i++ {
 		id := strconv.FormatUint(i, 10)
