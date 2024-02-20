@@ -68,8 +68,6 @@ func NewDefaultStubBeaconClient(t *testing.T) *StubBeaconClient {
 	fourBlobs := blobtest.NewBlobSidecars(t, 5)
 	fiveBlobs := blobtest.NewBlobSidecars(t, 6)
 
-	startSlot := blobtest.StartSlot
-
 	return &StubBeaconClient{
 		Headers: map[string]*v1.BeaconBlockHeader{
 			// Lookup by hash

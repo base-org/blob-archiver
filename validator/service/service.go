@@ -50,7 +50,8 @@ type ValidatorService struct {
 	closeApp     context.CancelCauseFunc
 }
 
-// Start starts the validator service
+// Start starts the validator service. This will fetch the current range of blocks to validate and start the validation
+// process.
 func (a *ValidatorService) Start(ctx context.Context) error {
 	header, err := retry.Do(ctx, retryAttempts, retry.Exponential(), func() (*api.Response[*v1.BeaconBlockHeader], error) {
 		return a.headerClient.BeaconBlockHeader(ctx, &api.BeaconBlockHeaderOpts{
@@ -101,7 +102,7 @@ type CheckBlobResult struct {
 func (a *ValidatorService) checkBlobs(ctx context.Context, start phase0.Slot, end phase0.Slot) CheckBlobResult {
 	var result CheckBlobResult
 
-	for slot := start; slot < end; slot++ {
+	for slot := start; slot <= end; slot++ {
 		for _, format := range []Format{FormatJson, FormatSSZ} {
 			id := strconv.FormatUint(uint64(slot), 10)
 
@@ -111,6 +112,12 @@ func (a *ValidatorService) checkBlobs(ctx context.Context, start phase0.Slot, en
 				return a.blobAPI.FetchSidecars(id, format)
 			})
 
+			if blobError != nil {
+				result.ErrorFetching = append(result.ErrorFetching, id)
+				l.Error(validationErrorLog, "reason", "error-blob-api", "error", blobError, "status", blobStatus)
+				continue
+			}
+
 			beaconStatus, beaconResponse, beaconErr := retry.Do2(ctx, retryAttempts, retry.Exponential(), func() (int, storage.BlobSidecars, error) {
 				return a.beaconAPI.FetchSidecars(id, format)
 			})
@@ -118,12 +125,6 @@ func (a *ValidatorService) checkBlobs(ctx context.Context, start phase0.Slot, en
 			if beaconErr != nil {
 				result.ErrorFetching = append(result.ErrorFetching, id)
 				l.Error(validationErrorLog, "reason", "error-beacon-api", "error", beaconErr, "status", beaconStatus)
-				continue
-			}
-
-			if blobError != nil {
-				result.ErrorFetching = append(result.ErrorFetching, id)
-				l.Error(validationErrorLog, "reason", "error-blob-api", "error", blobError, "status", blobStatus)
 				continue
 			}
 
@@ -148,6 +149,7 @@ func (a *ValidatorService) checkBlobs(ctx context.Context, start phase0.Slot, en
 			l.Info("completed blob check", "blobs", len(beaconResponse.Data))
 		}
 
+		// Check if we should stop validation otherwise continue
 		select {
 		case <-ctx.Done():
 			return result

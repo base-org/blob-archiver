@@ -31,7 +31,7 @@ type stubBlobSidecarClient struct {
 	data map[string]response
 }
 
-// setResponses configures the stub to return the same blob data as the beacon client
+// setResponses configures the stub to return the same data as the beacon client for all FetchSidecars invocations
 func (s *stubBlobSidecarClient) setResponses(sbc *beacontest.StubBeaconClient) {
 	for k, v := range sbc.Blobs {
 		s.data[k] = response{
@@ -42,6 +42,7 @@ func (s *stubBlobSidecarClient) setResponses(sbc *beacontest.StubBeaconClient) {
 	}
 }
 
+// setResponse overrides a single FetchSidecars response
 func (s *stubBlobSidecarClient) setResponse(id string, statusCode int, data storage.BlobSidecars, err error) {
 	s.data[id] = response{
 		data:       data,
@@ -80,7 +81,8 @@ func TestValidatorService_OnFetchError(t *testing.T) {
 
 	// Expect an error for both SSZ and JSON
 	startSlot := strconv.FormatUint(blobtest.StartSlot, 10)
-	require.Equal(t, result.ErrorFetching, []string{startSlot, startSlot})
+	endSlot := strconv.FormatUint(blobtest.StartSlot+1, 10)
+	require.Equal(t, result.ErrorFetching, []string{startSlot, startSlot, endSlot, endSlot})
 	require.Empty(t, result.MismatchedStatus)
 	require.Empty(t, result.MismatchedData)
 }
