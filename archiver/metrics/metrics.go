@@ -11,8 +11,9 @@ type BlockSource string
 var (
 	MetricsNamespace = "blob_archiver"
 
-	BlockSourceBackfill BlockSource = "backfill"
-	BlockSourceLive     BlockSource = "live"
+	BlockSourceBackfill  BlockSource = "backfill"
+	BlockSourceLive      BlockSource = "live"
+	BlockSourceRearchive BlockSource = "rearchive"
 )
 
 type Metricer interface {

@@ -17,6 +17,8 @@ var (
 	Three       = common.Hash{3}
 	Four        = common.Hash{4}
 	Five        = common.Hash{5}
+
+	StartSlot = uint64(10)
 )
 
 func RandBytes(t *testing.T, size uint) []byte {

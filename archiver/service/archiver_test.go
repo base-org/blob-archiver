@@ -17,15 +17,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setup(t *testing.T, beacon *beacontest.StubBeaconClient) (*ArchiverService, *storagetest.TestFileStorage) {
+func setup(t *testing.T, beacon *beacontest.StubBeaconClient) (*Archiver, *storagetest.TestFileStorage) {
 	l := testlog.Logger(t, log.LvlInfo)
 	fs := storagetest.NewTestFileStorage(t, l)
 	m := metrics.NewMetrics()
 
-	svc, err := NewService(l, flags.ArchiverConfig{
+	svc, err := NewArchiver(l, flags.ArchiverConfig{
 		PollInterval: 5 * time.Second,
 		OriginBlock:  blobtest.OriginBlock,
-	}, NewAPI(m, l), fs, beacon, m)
+	}, fs, beacon, m)
 	require.NoError(t, err)
 	return svc, fs
 }
@@ -35,7 +35,7 @@ func TestArchiver_FetchAndPersist(t *testing.T) {
 
 	fs.CheckNotExistsOrFail(t, blobtest.OriginBlock)
 
-	header, alreadyExists, err := svc.persistBlobsForBlockToS3(context.Background(), blobtest.OriginBlock.String())
+	header, alreadyExists, err := svc.persistBlobsForBlockToS3(context.Background(), blobtest.OriginBlock.String(), false)
 	require.False(t, alreadyExists)
 	require.NoError(t, err)
 	require.NotNil(t, header)
@@ -43,13 +43,45 @@ func TestArchiver_FetchAndPersist(t *testing.T) {
 
 	fs.CheckExistsOrFail(t, blobtest.OriginBlock)
 
-	header, alreadyExists, err = svc.persistBlobsForBlockToS3(context.Background(), blobtest.OriginBlock.String())
+	header, alreadyExists, err = svc.persistBlobsForBlockToS3(context.Background(), blobtest.OriginBlock.String(), false)
 	require.True(t, alreadyExists)
 	require.NoError(t, err)
 	require.NotNil(t, header)
 	require.Equal(t, blobtest.OriginBlock.String(), common.Hash(header.Root).String())
 
 	fs.CheckExistsOrFail(t, blobtest.OriginBlock)
+}
+
+func TestArchiver_FetchAndPersistOverwriting(t *testing.T) {
+	beacon := beacontest.NewDefaultStubBeaconClient(t)
+	svc, fs := setup(t, beacon)
+
+	// Blob 5 already exists
+	fs.WriteOrFail(t, storage.BlobData{
+		Header: storage.Header{
+			BeaconBlockHash: blobtest.Five,
+		},
+		BlobSidecars: storage.BlobSidecars{
+			Data: beacon.Blobs[blobtest.Five.String()],
+		},
+	})
+
+	require.Equal(t, fs.ReadOrFail(t, blobtest.Five).BlobSidecars.Data, beacon.Blobs[blobtest.Five.String()])
+
+	// change the blob data -- this isn't possible w/out changing the hash. But it allows us to test the overwrite
+	beacon.Blobs[blobtest.Five.String()] = blobtest.NewBlobSidecars(t, 6)
+
+	_, exists, err := svc.persistBlobsForBlockToS3(context.Background(), blobtest.Five.String(), true)
+	require.NoError(t, err)
+	require.True(t, exists)
+
+	// It should have overwritten the blob data
+	require.Equal(t, fs.ReadOrFail(t, blobtest.Five).BlobSidecars.Data, beacon.Blobs[blobtest.Five.String()])
+
+	// Overwriting a non-existent blob should return exists=false
+	_, exists, err = svc.persistBlobsForBlockToS3(context.Background(), blobtest.Four.String(), true)
+	require.NoError(t, err)
+	require.False(t, exists)
 }
 
 func TestArchiver_BackfillToOrigin(t *testing.T) {
@@ -302,4 +334,45 @@ func TestArchiver_LatestHaltsOnPersistentError(t *testing.T) {
 	fs.CheckNotExistsOrFail(t, blobtest.Five)
 	fs.CheckNotExistsOrFail(t, blobtest.Four)
 	fs.CheckExistsOrFail(t, blobtest.Three)
+}
+
+func TestArchiver_RearchiveRange(t *testing.T) {
+	beacon := beacontest.NewDefaultStubBeaconClient(t)
+	svc, fs := setup(t, beacon)
+
+	// 5 is the current head, if three already exists, we should write 5 and 4 and stop at three
+	fs.WriteOrFail(t, storage.BlobData{
+		Header: storage.Header{
+			BeaconBlockHash: blobtest.Three,
+		},
+		BlobSidecars: storage.BlobSidecars{
+			Data: beacon.Blobs[blobtest.Three.String()],
+		},
+	})
+
+	// startSlot+1 == One
+	fs.CheckNotExistsOrFail(t, blobtest.One)
+	fs.CheckNotExistsOrFail(t, blobtest.Two)
+	fs.CheckExistsOrFail(t, blobtest.Three)
+	fs.CheckNotExistsOrFail(t, blobtest.Four)
+
+	// this modifies the blobs at 3, purely to test the blob is rearchived
+	beacon.Blobs[blobtest.Three.String()] = blobtest.NewBlobSidecars(t, 6)
+
+	from, to := blobtest.StartSlot+1, blobtest.StartSlot+4
+
+	actualFrom, actualTo, err := svc.rearchiveRange(from, to)
+	// Should index the whole range
+	require.NoError(t, err)
+	require.Equal(t, from, actualFrom)
+	require.Equal(t, to, actualTo)
+
+	// Should have written all the blobs
+	fs.CheckExistsOrFail(t, blobtest.One)
+	fs.CheckExistsOrFail(t, blobtest.Two)
+	fs.CheckExistsOrFail(t, blobtest.Three)
+	fs.CheckExistsOrFail(t, blobtest.Four)
+
+	// Should have overwritten any existing blobs
+	require.Equal(t, fs.ReadOrFail(t, blobtest.Three).BlobSidecars.Data, beacon.Blobs[blobtest.Three.String()])
 }
