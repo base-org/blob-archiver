@@ -39,8 +39,9 @@ func (e httpError) Error() string {
 }
 
 const (
-	sszAcceptType = "application/octet-stream"
-	serverTimeout = 60 * time.Second
+	jsonAcceptType = "application/json"
+	sszAcceptType  = "application/octet-stream"
+	serverTimeout  = 60 * time.Second
 )
 
 var (
@@ -97,6 +98,7 @@ func NewAPI(dataStoreClient storage.DataStoreReader, beaconClient client.BeaconB
 	r.Use(middleware.Timeout(serverTimeout))
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Heartbeat("/healthz"))
+	r.Use(middleware.Compress(5, jsonAcceptType, sszAcceptType))
 
 	recorder := opmetrics.NewPromHTTPRecorder(metrics.Registry(), m.MetricsNamespace)
 	r.Use(func(handler http.Handler) http.Handler {
@@ -187,6 +189,7 @@ func (a *API) blobSidecarHandler(w http.ResponseWriter, r *http.Request) {
 	responseType := r.Header.Get("Accept")
 
 	if responseType == sszAcceptType {
+		w.Header().Set("Content-Type", sszAcceptType)
 		res, err := blobSidecars.MarshalSSZ()
 		if err != nil {
 			a.logger.Error("unable to marshal blob sidecars to SSZ", "err", err)
@@ -202,6 +205,7 @@ func (a *API) blobSidecarHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
+		w.Header().Set("Content-Type", jsonAcceptType)
 		err := json.NewEncoder(w).Encode(blobSidecars)
 		if err != nil {
 			a.logger.Error("unable to encode blob sidecars to JSON", "err", err)
