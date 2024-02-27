@@ -1,9 +1,11 @@
 package service
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http/httptest"
 	"os"
 	"testing"
@@ -228,38 +230,59 @@ func TestAPIService(t *testing.T) {
 
 	for _, test := range tests {
 		for _, rf := range responseFormat {
-			t.Run(fmt.Sprintf("%s-%s", test.name, rf), func(t *testing.T) {
-				request := httptest.NewRequest("GET", test.path, nil)
-				request.Header.Set("Accept", rf)
+			for _, compress := range []bool{true, false} {
+				testName := fmt.Sprintf("%s-%s", test.name, rf)
+				if compress {
+					testName = fmt.Sprintf("%s-%s", testName, "gzip")
+				}
 
-				response := httptest.NewRecorder()
+				t.Run(testName, func(t *testing.T) {
+					request := httptest.NewRequest("GET", test.path, nil)
+					request.Header.Set("Accept", rf)
 
-				a.router.ServeHTTP(response, request)
-
-				require.Equal(t, test.status, response.Code)
-
-				if test.status == 200 && test.expected != nil {
-					blobSidecars := storage.BlobSidecars{}
-
-					var err error
-					if rf == "application/octet-stream" {
-						res := api.BlobSidecars{}
-						err = res.UnmarshalSSZ(response.Body.Bytes())
-						blobSidecars.Data = res.Sidecars
-					} else {
-						err = json.Unmarshal(response.Body.Bytes(), &blobSidecars)
+					if compress {
+						request.Header.Set("Accept-Encoding", "gzip")
 					}
 
-					require.NoError(t, err)
-					require.Equal(t, *test.expected, blobSidecars)
-				} else if test.status != 200 && rf == "application/json" && test.errMessage != "" {
-					var e httpError
-					err := json.Unmarshal(response.Body.Bytes(), &e)
-					require.NoError(t, err)
-					require.Equal(t, test.status, e.Code)
-					require.Equal(t, test.errMessage, e.Message)
-				}
-			})
+					response := httptest.NewRecorder()
+
+					a.router.ServeHTTP(response, request)
+
+					require.Equal(t, test.status, response.Code)
+
+					if test.status == 200 && test.expected != nil {
+						var data []byte
+						if compress {
+							reader, err := gzip.NewReader(response.Body)
+							require.NoError(t, err)
+
+							data, err = io.ReadAll(reader)
+							require.NoError(t, err)
+						} else {
+							data = response.Body.Bytes()
+						}
+
+						blobSidecars := storage.BlobSidecars{}
+
+						if rf == "application/octet-stream" {
+							res := api.BlobSidecars{}
+							err = res.UnmarshalSSZ(data)
+							blobSidecars.Data = res.Sidecars
+						} else {
+							err = json.Unmarshal(data, &blobSidecars)
+						}
+
+						require.NoError(t, err)
+						require.Equal(t, *test.expected, blobSidecars)
+					} else if test.status != 200 && rf == "application/json" && test.errMessage != "" {
+						var e httpError
+						err := json.Unmarshal(response.Body.Bytes(), &e)
+						require.NoError(t, err)
+						require.Equal(t, test.status, e.Code)
+						require.Equal(t, test.errMessage, e.Message)
+					}
+				})
+			}
 		}
 	}
 }
