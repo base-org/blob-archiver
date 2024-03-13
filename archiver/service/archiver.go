@@ -137,13 +137,18 @@ func (a *Archiver) persistBlobsForBlockToS3(ctx context.Context, blockIdentifier
 func (a *Archiver) backfillBlobs(ctx context.Context, latest *v1.BeaconBlockHeader) {
 	current, alreadyExists, err := latest, false, error(nil)
 
+	defer func() {
+		a.log.Info("backfill complete", "endHash", current.Root.String(), "startHash", latest.Root.String())
+	}()
+
 	for !alreadyExists {
+		previous := current
+
 		if common.Hash(current.Root) == a.cfg.OriginBlock {
 			a.log.Info("reached origin block", "hash", current.Root.String())
 			return
 		}
 
-		previous := current
 		current, alreadyExists, err = a.persistBlobsForBlockToS3(ctx, previous.Header.Message.ParentRoot.String(), false)
 		if err != nil {
 			a.log.Error("failed to persist blobs for block, will retry", "err", err, "hash", previous.Header.Message.ParentRoot.String())
@@ -157,8 +162,6 @@ func (a *Archiver) backfillBlobs(ctx context.Context, latest *v1.BeaconBlockHead
 			a.metrics.RecordProcessedBlock(metrics.BlockSourceBackfill)
 		}
 	}
-
-	a.log.Info("backfill complete", "endHash", current.Root.String(), "startHash", latest.Root.String())
 }
 
 // trackLatestBlocks will poll the beacon node for the latest blocks and persist blobs for them.
