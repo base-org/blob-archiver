@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"io"
 )
 
 type S3Storage struct {
@@ -65,7 +66,7 @@ func (s *S3Storage) Read(ctx context.Context, hash common.Hash) (BlobData, error
 		return BlobData{}, ErrStorage
 	}
 	defer res.Close()
-	_, err = res.Stat()
+	stat, err := res.Stat()
 	if err != nil {
 		errResponse := minio.ToErrorResponse(err)
 		if errResponse.Code == "NoSuchKey" {
@@ -77,10 +78,19 @@ func (s *S3Storage) Read(ctx context.Context, hash common.Hash) (BlobData, error
 		}
 	}
 
-	// TODO: We may need to decode if it's gzipped
+	var reader io.ReadCloser = res
+	defer reader.Close()
+
+	if stat.Metadata.Get("Content-Encoding") == "gzip" {
+		reader, err = gzip.NewReader(reader)
+		if err != nil {
+			s.log.Warn("error creating gzip reader", "hash", hash.String(), "err", err)
+			return BlobData{}, ErrMarshaling
+		}
+	}
 
 	var data BlobData
-	err = json.NewDecoder(res).Decode(&data)
+	err = json.NewDecoder(reader).Decode(&data)
 	if err != nil {
 		s.log.Warn("error decoding blob", "hash", hash.String(), "err", err)
 		return BlobData{}, ErrMarshaling
