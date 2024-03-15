@@ -21,6 +21,8 @@ var (
 	ErrStorage = errors.New("error accessing storage")
 	// ErrMarshaling is returned when there is an error in (un)marshaling the blob
 	ErrMarshaling = errors.New("error encoding/decoding blob")
+	// ErrCompress is returned when there is an error gzipping the data
+	ErrCompress = errors.New("error compressing blob")
 )
 
 type Header struct {

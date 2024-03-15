@@ -12,6 +12,7 @@ const (
 	S3CredentialTypeFlagName        = "s3-credential-type"
 	S3EndpointFlagName              = "s3-endpoint"
 	S3EndpointHttpsFlagName         = "s3-endpoint-https"
+	S3CompressFlagName              = "s3-compress"
 	S3AccessKeyFlagName             = "s3-access-key"
 	S3SecretAccessKeyFlagName       = "s3-secret-access-key"
 	S3BucketFlagName                = "s3-bucket"
@@ -50,6 +51,12 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:   "Whether to use https for the S3 bucket",
 			Value:   true,
 			EnvVars: opservice.PrefixEnvVar(envPrefix, "S3_ENDPOINT_HTTPS"),
+		},
+		&cli.BoolFlag{
+			Name:    S3CompressFlagName,
+			Usage:   "Whether to compress data before storing in S3",
+			Value:   false,
+			EnvVars: opservice.PrefixEnvVar(envPrefix, "S3_COMPRESS"),
 		},
 		&cli.StringFlag{
 			Name:    S3AccessKeyFlagName,

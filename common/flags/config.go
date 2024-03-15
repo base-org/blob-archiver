@@ -28,6 +28,7 @@ type S3Config struct {
 	S3CredentialType S3CredentialType
 	AccessKey        string
 	SecretAccessKey  string
+	Compress         bool
 }
 
 func (c S3Config) check() error {
@@ -104,6 +105,7 @@ func readS3Config(ctx *cli.Context) S3Config {
 		UseHttps:         ctx.Bool(S3EndpointHttpsFlagName),
 		Bucket:           ctx.String(S3BucketFlagName),
 		S3CredentialType: toS3CredentialType(ctx.String(S3CredentialTypeFlagName)),
+		Compress:         ctx.Bool(S3CompressFlagName),
 	}
 }
 

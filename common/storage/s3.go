@@ -2,8 +2,10 @@ package storage
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
 
 	"github.com/base-org/blob-archiver/common/flags"
 	"github.com/ethereum/go-ethereum/common"
@@ -13,9 +15,10 @@ import (
 )
 
 type S3Storage struct {
-	s3     *minio.Client
-	bucket string
-	log    log.Logger
+	s3       *minio.Client
+	bucket   string
+	log      log.Logger
+	compress bool
 }
 
 func NewS3Storage(cfg flags.S3Config, l log.Logger) (*S3Storage, error) {
@@ -36,9 +39,10 @@ func NewS3Storage(cfg flags.S3Config, l log.Logger) (*S3Storage, error) {
 	}
 
 	return &S3Storage{
-		s3:     client,
-		bucket: cfg.Bucket,
-		log:    l,
+		s3:       client,
+		bucket:   cfg.Bucket,
+		log:      l,
+		compress: cfg.Compress,
 	}, nil
 }
 
@@ -63,7 +67,7 @@ func (s *S3Storage) Read(ctx context.Context, hash common.Hash) (BlobData, error
 		return BlobData{}, ErrStorage
 	}
 	defer res.Close()
-	_, err = res.Stat()
+	stat, err := res.Stat()
 	if err != nil {
 		errResponse := minio.ToErrorResponse(err)
 		if errResponse.Code == "NoSuchKey" {
@@ -75,8 +79,19 @@ func (s *S3Storage) Read(ctx context.Context, hash common.Hash) (BlobData, error
 		}
 	}
 
+	var reader io.ReadCloser = res
+	defer reader.Close()
+
+	if stat.Metadata.Get("Content-Encoding") == "gzip" {
+		reader, err = gzip.NewReader(reader)
+		if err != nil {
+			s.log.Warn("error creating gzip reader", "hash", hash.String(), "err", err)
+			return BlobData{}, ErrMarshaling
+		}
+	}
+
 	var data BlobData
-	err = json.NewDecoder(res).Decode(&data)
+	err = json.NewDecoder(reader).Decode(&data)
 	if err != nil {
 		s.log.Warn("error decoding blob", "hash", hash.String(), "err", err)
 		return BlobData{}, ErrMarshaling
@@ -92,10 +107,22 @@ func (s *S3Storage) Write(ctx context.Context, data BlobData) error {
 		return ErrMarshaling
 	}
 
-	reader := bytes.NewReader(b)
-	_, err = s.s3.PutObject(ctx, s.bucket, data.Header.BeaconBlockHash.String(), reader, int64(len(b)), minio.PutObjectOptions{
+	options := minio.PutObjectOptions{
 		ContentType: "application/json",
-	})
+	}
+
+	if s.compress {
+		b, err = compress(b)
+		if err != nil {
+			s.log.Warn("error compressing blob", "err", err)
+			return ErrCompress
+		}
+		options.ContentEncoding = "gzip"
+	}
+
+	reader := bytes.NewReader(b)
+
+	_, err = s.s3.PutObject(ctx, s.bucket, data.Header.BeaconBlockHash.String(), reader, int64(len(b)), options)
 
 	if err != nil {
 		s.log.Warn("error writing blob", "err", err)
@@ -104,4 +131,18 @@ func (s *S3Storage) Write(ctx context.Context, data BlobData) error {
 
 	s.log.Info("wrote blob", "hash", data.Header.BeaconBlockHash.String())
 	return nil
+}
+
+func compress(in []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	_, err := gz.Write(in)
+	if err != nil {
+		return nil, err
+	}
+	err = gz.Close()
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
