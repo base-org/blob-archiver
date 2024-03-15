@@ -5,12 +5,13 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
+
 	"github.com/base-org/blob-archiver/common/flags"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"io"
 )
 
 type S3Storage struct {
