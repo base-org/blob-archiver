@@ -97,6 +97,29 @@ type CheckBlobResult struct {
 	MismatchedData []string
 }
 
+// shouldRetry returns true if the status code is one of the retryable status codes
+func shouldRetry(status int) bool {
+	switch status {
+	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout, http.StatusTooManyRequests:
+		return true
+	default:
+		return false
+	}
+}
+
+// fetchWithRetries fetches the sidecar and handles retryable error cases (5xx status codes + 429 + connection errors)
+func fetchWithRetries(ctx context.Context, endpoint BlobSidecarClient, id string, format Format) (int, storage.BlobSidecars, error) {
+	return retry.Do2(ctx, retryAttempts, retry.Exponential(), func() (int, storage.BlobSidecars, error) {
+		status, resp, err := endpoint.FetchSidecars(id, format)
+
+		if err == nil && status != http.StatusOK && shouldRetry(status) {
+			err = fmt.Errorf("retryable status code: %d", status)
+		}
+
+		return status, resp, err
+	})
+}
+
 // checkBlobs iterates all blocks in the range start:end and checks that the blobs from the beacon-node and blob-api
 // are identical, when encoded in both JSON and SSZ.
 func (a *ValidatorService) checkBlobs(ctx context.Context, start phase0.Slot, end phase0.Slot) CheckBlobResult {
@@ -108,9 +131,7 @@ func (a *ValidatorService) checkBlobs(ctx context.Context, start phase0.Slot, en
 
 			l := a.log.New("format", format, "slot", slot)
 
-			blobStatus, blobResponse, blobError := retry.Do2(ctx, retryAttempts, retry.Exponential(), func() (int, storage.BlobSidecars, error) {
-				return a.blobAPI.FetchSidecars(id, format)
-			})
+			blobStatus, blobResponse, blobError := fetchWithRetries(ctx, a.blobAPI, id, format)
 
 			if blobError != nil {
 				result.ErrorFetching = append(result.ErrorFetching, id)
@@ -118,9 +139,7 @@ func (a *ValidatorService) checkBlobs(ctx context.Context, start phase0.Slot, en
 				continue
 			}
 
-			beaconStatus, beaconResponse, beaconErr := retry.Do2(ctx, retryAttempts, retry.Exponential(), func() (int, storage.BlobSidecars, error) {
-				return a.beaconAPI.FetchSidecars(id, format)
-			})
+			beaconStatus, beaconResponse, beaconErr := fetchWithRetries(ctx, a.beaconAPI, id, format)
 
 			if beaconErr != nil {
 				result.ErrorFetching = append(result.ErrorFetching, id)
