@@ -136,7 +136,7 @@ func (a *ValidatorService) checkBlobs(ctx context.Context, start phase0.Slot, en
 
 			if beaconStatus != http.StatusOK {
 				// This can happen if the slot has been missed
-				l.Info("matching error status", "beacon", beaconStatus, "blob", blobStatus)
+				l.Info("matching error status", "beaconStatus", beaconStatus, "blobStatus", blobStatus)
 				continue
 
 			}
