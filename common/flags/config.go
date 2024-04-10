@@ -60,6 +60,7 @@ func (c S3Config) check() error {
 type BeaconConfig struct {
 	BeaconURL           string
 	BeaconClientTimeout time.Duration
+	EnforceJSON         bool
 }
 
 type StorageConfig struct {
@@ -74,6 +75,7 @@ func NewBeaconConfig(cliCtx *cli.Context) BeaconConfig {
 	return BeaconConfig{
 		BeaconURL:           cliCtx.String(BeaconHttpFlagName),
 		BeaconClientTimeout: timeout,
+		EnforceJSON:         cliCtx.Bool(BeaconHttpEnforceJson),
 	}
 }
 
