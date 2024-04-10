@@ -8,6 +8,7 @@ import (
 const (
 	BeaconHttpFlagName              = "l1-beacon-http"
 	BeaconHttpClientTimeoutFlagName = "l1-beacon-client-timeout"
+	BeaconHttpEnforceJson           = "l1-beacon-enforce-json"
 	DataStoreFlagName               = "data-store"
 	S3CredentialTypeFlagName        = "s3-credential-type"
 	S3EndpointFlagName              = "s3-endpoint"
@@ -88,6 +89,12 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:   "The timeout duration for the beacon client",
 			Value:   "10s",
 			EnvVars: opservice.PrefixEnvVar(envPrefix, "L1_BEACON_CLIENT_TIMEOUT"),
+		},
+		&cli.BoolFlag{
+			Name:    BeaconHttpEnforceJson,
+			Usage:   "When true uses json for all requests/responses to the beacon node",
+			Value:   false,
+			EnvVars: opservice.PrefixEnvVar(envPrefix, "L1_BEACON_CLIENT_ENFORCE_JSON"),
 		},
 	}
 }

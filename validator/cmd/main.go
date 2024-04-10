@@ -48,7 +48,7 @@ func Main() cliapp.LifecycleAction {
 		}
 
 		l := oplog.NewLogger(oplog.AppOut(cliCtx), cfg.LogConfig)
-		oplog.SetGlobalLogHandler(l.GetHandler())
+		oplog.SetGlobalLogHandler(l.Handler())
 		opservice.ValidateEnvVars(flags.EnvVarPrefix, flags.Flags, l)
 
 		headerClient, err := beacon.NewBeaconClient(cliCtx.Context, cfg.BeaconConfig)
