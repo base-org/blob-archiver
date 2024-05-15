@@ -173,6 +173,14 @@ func TestAPIService(t *testing.T) {
 			},
 		},
 		{
+			name:   "multi indices",
+			path:   "/eth/v1/beacon/blob_sidecars/1234?indices=0&indices=1",
+			status: 200,
+			expected: &storage.BlobSidecars{
+				Data: blockTwo.BlobSidecars.Data,
+			},
+		},
+		{
 			name:       "only index out of bounds returns empty array",
 			path:       "/eth/v1/beacon/blob_sidecars/1234?indices=3",
 			status:     400,

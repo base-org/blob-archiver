@@ -179,7 +179,7 @@ func (a *API) blobSidecarHandler(w http.ResponseWriter, r *http.Request) {
 
 	blobSidecars := result.BlobSidecars
 
-	filteredBlobSidecars, err := filterBlobs(blobSidecars.Data, r.URL.Query().Get("indices"))
+	filteredBlobSidecars, err := filterBlobs(blobSidecars.Data, r.URL.Query()["indices"])
 	if err != nil {
 		err.write(w)
 		return
@@ -217,18 +217,18 @@ func (a *API) blobSidecarHandler(w http.ResponseWriter, r *http.Request) {
 
 // filterBlobs filters the blobs based on the indices query provided.
 // If no indices are provided, all blobs are returned. If invalid indices are provided, an error is returned.
-func filterBlobs(blobs []*deneb.BlobSidecar, indices string) ([]*deneb.BlobSidecar, *httpError) {
-	if indices == "" {
+func filterBlobs(blobs []*deneb.BlobSidecar, _indices []string) ([]*deneb.BlobSidecar, *httpError) {
+	var indices []string
+	if len(_indices) == 0 {
 		return blobs, nil
-	}
-
-	splits := strings.Split(indices, ",")
-	if len(splits) == 0 {
-		return blobs, nil
+	} else if len(_indices) == 1 {
+		indices = strings.Split(_indices[0], ",")
+	} else {
+		indices = _indices
 	}
 
 	indicesMap := map[deneb.BlobIndex]struct{}{}
-	for _, index := range splits {
+	for _, index := range indices {
 		parsedInt, err := strconv.ParseUint(index, 10, 64)
 		if err != nil {
 			return nil, newIndicesError(index)
