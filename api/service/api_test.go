@@ -15,10 +15,10 @@ import (
 	"github.com/attestantio/go-eth2-client/spec/deneb"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/base-org/blob-archiver/api/metrics"
-	"github.com/base-org/blob-archiver/api/version"
 	"github.com/base-org/blob-archiver/common/beacon/beacontest"
 	"github.com/base-org/blob-archiver/common/blobtest"
 	"github.com/base-org/blob-archiver/common/storage"
+	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -315,7 +315,7 @@ func TestVersionHandler(t *testing.T) {
 
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, "application/json", response.Header().Get("Content-Type"))
-	var v version.Version
+	var v eth.APIVersionResponse
 	err := json.Unmarshal(response.Body.Bytes(), &v)
 	require.NoError(t, err)
 	require.Equal(t, "Blob Archiver API/unknown", v.Data.Version)
