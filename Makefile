@@ -26,11 +26,15 @@ integration:
 	RUN_INTEGRATION_TESTS=true go test -v ./...
 .PHONY: integration
 
+vet:
+	go vet ./...
+.PHONY: vet
+
 fmt:
 	gofmt -s -w .
 .PHONY: fmt
 
-check: fmt clean build build-docker lint test integration
+check: fmt vet clean build build-docker lint test integration
 .PHONY: check
 
 lint:
