@@ -3,7 +3,8 @@ package flags
 import (
 	"fmt"
 	"time"
-
+	"strings"
+	
 	common "github.com/base-org/blob-archiver/common/flags"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
@@ -35,7 +36,7 @@ func (c ArchiverConfig) Check() error {
 	}
 
 	if c.OriginBlock == (geth.Hash{}) {
-		return fmt.Errorf("invalid origin block")
+		return fmt.Errorf("invalid origin block %s", c.OriginBlock)
 	}
 
 	if c.ListenAddr == "" {
@@ -47,13 +48,14 @@ func (c ArchiverConfig) Check() error {
 
 func ReadConfig(cliCtx *cli.Context) ArchiverConfig {
 	pollInterval, _ := time.ParseDuration(cliCtx.String(ArchiverPollIntervalFlag.Name))
+
 	return ArchiverConfig{
 		LogConfig:     oplog.ReadCLIConfig(cliCtx),
 		MetricsConfig: opmetrics.ReadCLIConfig(cliCtx),
 		BeaconConfig:  common.NewBeaconConfig(cliCtx),
 		StorageConfig: common.NewStorageConfig(cliCtx),
 		PollInterval:  pollInterval,
-		OriginBlock:   geth.HexToHash(cliCtx.String(ArchiverOriginBlock.Name)),
+		OriginBlock:   geth.HexToHash(strings.Trim(cliCtx.String(ArchiverOriginBlock.Name), "\"")),
 		ListenAddr:    cliCtx.String(ArchiverListenAddrFlag.Name),
 	}
 }
