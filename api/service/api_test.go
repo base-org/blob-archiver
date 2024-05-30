@@ -15,6 +15,7 @@ import (
 	"github.com/attestantio/go-eth2-client/spec/deneb"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/base-org/blob-archiver/api/metrics"
+	"github.com/base-org/blob-archiver/api/version"
 	"github.com/base-org/blob-archiver/common/beacon/beacontest"
 	"github.com/base-org/blob-archiver/common/blobtest"
 	"github.com/base-org/blob-archiver/common/storage"
@@ -301,6 +302,23 @@ func TestAPIService(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestVersionHandler(t *testing.T) {
+	a, _, _, cleanup := setup(t)
+	defer cleanup()
+
+	request := httptest.NewRequest("GET", "/eth/v1/node/version", nil)
+	response := httptest.NewRecorder()
+
+	a.router.ServeHTTP(response, request)
+
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, "application/json", response.Header().Get("Content-Type"))
+	var v version.Version
+	err := json.Unmarshal(response.Body.Bytes(), &v)
+	require.NoError(t, err)
+	require.Equal(t, "Blob Archiver API/unknown", v.Data.Version)
 }
 
 func TestHealthHandler(t *testing.T) {
