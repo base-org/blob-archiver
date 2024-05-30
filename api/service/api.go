@@ -15,6 +15,7 @@ import (
 	"github.com/attestantio/go-eth2-client/api"
 	"github.com/attestantio/go-eth2-client/spec/deneb"
 	m "github.com/base-org/blob-archiver/api/metrics"
+	"github.com/base-org/blob-archiver/api/version"
 	"github.com/base-org/blob-archiver/common/storage"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/ethereum/go-ethereum/common"
@@ -106,6 +107,7 @@ func NewAPI(dataStoreClient storage.DataStoreReader, beaconClient client.BeaconB
 	})
 
 	r.Get("/eth/v1/beacon/blob_sidecars/{id}", result.blobSidecarHandler)
+	r.Get("/eth/v1/node/version", result.versionHandler)
 
 	return result
 }
@@ -126,6 +128,17 @@ func isSlot(id string) bool {
 
 func isKnownIdentifier(id string) bool {
 	return slices.Contains([]string{"genesis", "finalized", "head"}, id)
+}
+
+// versionHandler implements the /eth/v1/node/version endpoint.
+func (a *API) versionHandler(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", jsonAcceptType)
+	w.WriteHeader(http.StatusOK)
+	err := json.NewEncoder(w).Encode(version.APIVersion)
+	if err != nil {
+		a.logger.Error("unable to encode version to JSON", "err", err)
+		errServerError.write(w)
+	}
 }
 
 // toBeaconBlockHash converts a string that can be a slot, hash or identifier to a beacon block hash.
