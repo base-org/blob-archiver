@@ -1,0 +1,36 @@
+name: Pull Request
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [ linux/amd64, linux/arm64 ]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '>=1.21.0'
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Go Format
+        run: make fmt && git diff --exit-code
+      - name: Go Vet
+        run: make vet
+      - name: Go Tidy
+        run: go mod tidy && git diff --exit-code
+      - name: Go Mod
+        run: go mod download
+      - name: Go Mod Verify
+        run: go mod verify
+      - name: Go Test
+        run: make test
+      - name: Build Docker
+        uses: docker/build-push-action@v5
+        with:
+          push: false
