@@ -17,6 +17,7 @@ const (
 	S3AccessKeyFlagName             = "s3-access-key"
 	S3SecretAccessKeyFlagName       = "s3-secret-access-key"
 	S3BucketFlagName                = "s3-bucket"
+	S3PathFlagName                  = "s3-path"
 	FileStorageDirectoryFlagName    = "file-directory"
 )
 
@@ -76,6 +77,12 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:   "The bucket to use",
 			Hidden:  true,
 			EnvVars: opservice.PrefixEnvVar(envPrefix, "S3_BUCKET"),
+		},
+		&cli.StringFlag{
+			Name:    S3PathFlagName,
+			Usage:   "The path to append to file",
+			Hidden:  true,
+			EnvVars: opservice.PrefixEnvVar(envPrefix, "S3_PATH"),
 		},
 		// File Data Store Flags
 		&cli.StringFlag{
