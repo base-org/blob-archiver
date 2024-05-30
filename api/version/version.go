@@ -1,10 +1,14 @@
 package version
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/ethereum-optimism/optimism/op-service/eth"
+)
 
 var (
 	GitCommit  = ""
-	APIVersion Version
+	APIVersion eth.APIVersionResponse
 )
 
 func init() {
@@ -13,17 +17,9 @@ func init() {
 		commit = "unknown"
 	}
 
-	APIVersion = Version{
-		Data: struct {
-			Version string `json:"version"`
-		}{
+	APIVersion = eth.APIVersionResponse{
+		Data: eth.VersionInformation{
 			Version: fmt.Sprintf("Blob Archiver API/%s", commit),
 		},
 	}
-}
-
-type Version struct {
-	Data struct {
-		Version string `json:"version"`
-	} `json:"data"`
 }
