@@ -14,8 +14,8 @@ import (
 
 // Prior to running these tests, a local Minio server must be running.
 // You can accomplish this with:
-// docker-compose down # shut down any running services
-// docker-compose up minio create-buckets # start the minio service
+// docker compose down # shut down any running services
+// docker compose up minio create-buckets # start the minio service
 func setupS3(t *testing.T) *S3Storage {
 	if os.Getenv("RUN_INTEGRATION_TESTS") == "" {
 		t.Skip("skipping integration tests: set RUN_INTEGRATION_TESTS environment variable")

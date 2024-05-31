@@ -46,7 +46,7 @@ To run the project locally, you should first copy `.env.template` to `.env` and 
 to your beacon client and storage backend of choice. Then you can run the project with:
 
 ```sh
-docker-compose up
+docker compose up
 ```
 
 You can see a full list of configuration options by running:

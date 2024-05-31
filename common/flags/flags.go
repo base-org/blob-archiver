@@ -83,6 +83,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:   "The path to append to file",
 			Hidden:  true,
 			EnvVars: opservice.PrefixEnvVar(envPrefix, "S3_PATH"),
+			Value:   "",
 		},
 		// File Data Store Flags
 		&cli.StringFlag{
