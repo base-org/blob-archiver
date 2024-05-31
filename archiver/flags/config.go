@@ -2,9 +2,9 @@ package flags
 
 import (
 	"fmt"
-	"time"
 	"strings"
-	
+	"time"
+
 	common "github.com/base-org/blob-archiver/common/flags"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
@@ -48,7 +48,6 @@ func (c ArchiverConfig) Check() error {
 
 func ReadConfig(cliCtx *cli.Context) ArchiverConfig {
 	pollInterval, _ := time.ParseDuration(cliCtx.String(ArchiverPollIntervalFlag.Name))
-
 	return ArchiverConfig{
 		LogConfig:     oplog.ReadCLIConfig(cliCtx),
 		MetricsConfig: opmetrics.ReadCLIConfig(cliCtx),

@@ -5,7 +5,7 @@ build:
 .PHONY: build
 
 build-docker:
-	docker-compose build
+	docker compose build
 .PHONY: build-docker
 
 clean:
@@ -21,8 +21,8 @@ test:
 .PHONY: test
 
 integration:
-	docker-compose down
-	docker-compose up -d minio create-buckets
+	docker compose down
+	docker compose up -d minio create-buckets
 	RUN_INTEGRATION_TESTS=true go test -v ./...
 .PHONY: integration
 
