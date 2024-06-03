@@ -2,6 +2,7 @@ package flags
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	common "github.com/base-org/blob-archiver/common/flags"
@@ -35,7 +36,7 @@ func (c ArchiverConfig) Check() error {
 	}
 
 	if c.OriginBlock == (geth.Hash{}) {
-		return fmt.Errorf("invalid origin block")
+		return fmt.Errorf("invalid origin block %s", c.OriginBlock)
 	}
 
 	if c.ListenAddr == "" {
@@ -53,7 +54,7 @@ func ReadConfig(cliCtx *cli.Context) ArchiverConfig {
 		BeaconConfig:  common.NewBeaconConfig(cliCtx),
 		StorageConfig: common.NewStorageConfig(cliCtx),
 		PollInterval:  pollInterval,
-		OriginBlock:   geth.HexToHash(cliCtx.String(ArchiverOriginBlock.Name)),
+		OriginBlock:   geth.HexToHash(strings.Trim(cliCtx.String(ArchiverOriginBlock.Name), "\"")),
 		ListenAddr:    cliCtx.String(ArchiverListenAddrFlag.Name),
 	}
 }

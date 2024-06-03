@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"path"
 
 	"github.com/base-org/blob-archiver/common/flags"
 	"github.com/ethereum/go-ethereum/common"
@@ -17,6 +18,7 @@ import (
 type S3Storage struct {
 	s3       *minio.Client
 	bucket   string
+	path     string
 	log      log.Logger
 	compress bool
 }
@@ -41,13 +43,14 @@ func NewS3Storage(cfg flags.S3Config, l log.Logger) (*S3Storage, error) {
 	return &S3Storage{
 		s3:       client,
 		bucket:   cfg.Bucket,
+		path:     cfg.Path,
 		log:      l,
 		compress: cfg.Compress,
 	}, nil
 }
 
 func (s *S3Storage) Exists(ctx context.Context, hash common.Hash) (bool, error) {
-	_, err := s.s3.StatObject(ctx, s.bucket, hash.String(), minio.StatObjectOptions{})
+	_, err := s.s3.StatObject(ctx, s.bucket, path.Join(s.path, hash.String()), minio.StatObjectOptions{})
 	if err != nil {
 		errResponse := minio.ToErrorResponse(err)
 		if errResponse.Code == "NoSuchKey" {
@@ -61,7 +64,7 @@ func (s *S3Storage) Exists(ctx context.Context, hash common.Hash) (bool, error) 
 }
 
 func (s *S3Storage) Read(ctx context.Context, hash common.Hash) (BlobData, error) {
-	res, err := s.s3.GetObject(ctx, s.bucket, hash.String(), minio.GetObjectOptions{})
+	res, err := s.s3.GetObject(ctx, s.bucket, path.Join(s.path, hash.String()), minio.GetObjectOptions{})
 	if err != nil {
 		s.log.Info("unexpected error fetching blob", "hash", hash.String(), "err", err)
 		return BlobData{}, ErrStorage
@@ -122,7 +125,7 @@ func (s *S3Storage) Write(ctx context.Context, data BlobData) error {
 
 	reader := bytes.NewReader(b)
 
-	_, err = s.s3.PutObject(ctx, s.bucket, data.Header.BeaconBlockHash.String(), reader, int64(len(b)), options)
+	_, err = s.s3.PutObject(ctx, s.bucket, path.Join(s.path, data.Header.BeaconBlockHash.String()), reader, int64(len(b)), options)
 
 	if err != nil {
 		s.log.Warn("error writing blob", "err", err)
