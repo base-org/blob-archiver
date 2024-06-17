@@ -71,7 +71,9 @@ func setup(t *testing.T) (*ValidatorService, *beacontest.StubBeaconClient, *stub
 		data: make(map[string]response),
 	}
 
-	return NewValidator(l, headerClient, beacon, blob, cancel), headerClient, beacon, blob
+	HoursOfBlobData := 5 * 2 * 60 // 2 hours of blob data at 5 blocks per minute
+
+	return NewValidator(l, headerClient, beacon, blob, cancel, HoursOfBlobData), headerClient, beacon, blob
 }
 
 func TestValidatorService_OnFetchError(t *testing.T) {
