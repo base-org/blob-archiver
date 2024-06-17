@@ -59,6 +59,6 @@ func Main() cliapp.LifecycleAction {
 		beaconClient := service.NewBlobSidecarClient(cfg.BeaconConfig.BeaconURL)
 		blobClient := service.NewBlobSidecarClient(cfg.BlobConfig.BeaconURL)
 
-		return service.NewValidator(l, headerClient, beaconClient, blobClient, closeApp, cfg.BlocksPerMinuteConfig*cfg.HoursOfBlobDataConfig*60), nil
+		return service.NewValidator(l, headerClient, beaconClient, blobClient, closeApp, cfg.NumBlocks), nil
 	}
 }

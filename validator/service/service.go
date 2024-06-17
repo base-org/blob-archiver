@@ -29,25 +29,25 @@ const (
 	retryAttempts = 10
 )
 
-func NewValidator(l log.Logger, headerClient client.BeaconBlockHeadersProvider, beaconAPI BlobSidecarClient, blobAPI BlobSidecarClient, app context.CancelCauseFunc, hoursOfBlocks int) *ValidatorService {
+func NewValidator(l log.Logger, headerClient client.BeaconBlockHeadersProvider, beaconAPI BlobSidecarClient, blobAPI BlobSidecarClient, app context.CancelCauseFunc, numBlocks int) *ValidatorService {
 	return &ValidatorService{
-		log:           l,
-		headerClient:  headerClient,
-		beaconAPI:     beaconAPI,
-		blobAPI:       blobAPI,
-		closeApp:      app,
-		hoursOfBlocks: hoursOfBlocks,
+		log:          l,
+		headerClient: headerClient,
+		beaconAPI:    beaconAPI,
+		blobAPI:      blobAPI,
+		closeApp:     app,
+		numBlocks:    numBlocks,
 	}
 }
 
 type ValidatorService struct {
-	stopped       atomic.Bool
-	log           log.Logger
-	headerClient  client.BeaconBlockHeadersProvider
-	beaconAPI     BlobSidecarClient
-	blobAPI       BlobSidecarClient
-	closeApp      context.CancelCauseFunc
-	hoursOfBlocks int
+	stopped      atomic.Bool
+	log          log.Logger
+	headerClient client.BeaconBlockHeadersProvider
+	beaconAPI    BlobSidecarClient
+	blobAPI      BlobSidecarClient
+	closeApp     context.CancelCauseFunc
+	numBlocks    int
 }
 
 // Start starts the validator service. This will fetch the current range of blocks to validate and start the validation
@@ -64,7 +64,7 @@ func (a *ValidatorService) Start(ctx context.Context) error {
 	}
 
 	end := header.Data.Header.Message.Slot - finalizedL1Offset
-	start := end - phase0.Slot(a.hoursOfBlocks)
+	start := end - phase0.Slot(a.numBlocks)
 
 	go a.checkBlobs(ctx, start, end)
 
