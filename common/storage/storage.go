@@ -3,7 +3,9 @@ package storage
 import (
 	"context"
 	"errors"
+	"sync"
 
+	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec/deneb"
 	"github.com/base-org/blob-archiver/common/flags"
 	"github.com/ethereum/go-ethereum/common"
@@ -62,6 +64,18 @@ type BlobData struct {
 	BlobSidecars BlobSidecars `json:"blob_sidecars"`
 }
 
+var BackfillMu sync.Mutex
+
+type BackfillProcess struct {
+	Start   v1.BeaconBlockHeader `json:"start_block"`
+	Current v1.BeaconBlockHeader `json:"current_block"`
+}
+
+// BackfillProcesses maps backfill start block hash --> BackfillProcess. This allows us to track
+// multiple processes and reengage a previous backfill in case an archiver restart interrupted
+// an active backfill
+type BackfillProcesses map[common.Hash]BackfillProcess
+
 // DataStoreReader is the interface for reading from a data store.
 type DataStoreReader interface {
 	// Exists returns true if the given blob hash exists in the data store, false otherwise.
@@ -69,22 +83,24 @@ type DataStoreReader interface {
 	// - nil: the existence check was successful. In this case the boolean should also be set correctly.
 	// - ErrStorage: there was an error accessing the data store.
 	Exists(ctx context.Context, hash common.Hash) (bool, error)
-	// Read reads the blob data for the given beacon block hash from the data store.
+	// ReadBlob reads the blob data for the given beacon block hash from the data store.
 	// It should return one of the following:
 	// - nil: reading the blob was successful. The blob data is also returned.
 	// - ErrNotFound: the blob data was not found in the data store.
 	// - ErrStorage: there was an error accessing the data store.
 	// - ErrMarshaling: there was an error decoding the blob data.
-	Read(ctx context.Context, hash common.Hash) (BlobData, error)
+	ReadBlob(ctx context.Context, hash common.Hash) (BlobData, error)
+	ReadBackfillProcesses(ctx context.Context) (BackfillProcesses, error)
 }
 
 // DataStoreWriter is the interface for writing to a data store.
 type DataStoreWriter interface {
-	// Write writes the given blob data to the data store. It should return one of the following errors:
+	// WriteBlob writes the given blob data to the data store. It should return one of the following errors:
 	// - nil: writing the blob was successful.
 	// - ErrStorage: there was an error accessing the data store.
 	// - ErrMarshaling: there was an error encoding the blob data.
-	Write(ctx context.Context, data BlobData) error
+	WriteBlob(ctx context.Context, data BlobData) error
+	WriteBackfillProcesses(ctx context.Context, data BackfillProcesses) error
 }
 
 // DataStore is the interface for a data store that can be both written to and read from.

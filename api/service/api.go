@@ -179,7 +179,7 @@ func (a *API) blobSidecarHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, storageErr := a.dataStoreClient.Read(r.Context(), beaconBlockHash)
+	result, storageErr := a.dataStoreClient.ReadBlob(r.Context(), beaconBlockHash)
 	if storageErr != nil {
 		if errors.Is(storageErr, storage.ErrNotFound) {
 			errUnknownBlock.write(w)

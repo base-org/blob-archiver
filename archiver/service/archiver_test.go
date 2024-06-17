@@ -89,7 +89,7 @@ func TestArchiver_BackfillToOrigin(t *testing.T) {
 	svc, fs := setup(t, beacon)
 
 	// We have the current head, which is block 5 written to storage
-	err := fs.Write(context.Background(), storage.BlobData{
+	err := fs.WriteBlob(context.Background(), storage.BlobData{
 		Header: storage.Header{
 			BeaconBlockHash: blobtest.Five,
 		},
@@ -119,7 +119,7 @@ func TestArchiver_BackfillToExistingBlock(t *testing.T) {
 	svc, fs := setup(t, beacon)
 
 	// We have the current head, which is block 5 written to storage
-	err := fs.Write(context.Background(), storage.BlobData{
+	err := fs.WriteBlob(context.Background(), storage.BlobData{
 		Header: storage.Header{
 			BeaconBlockHash: blobtest.Five,
 		},
@@ -130,7 +130,7 @@ func TestArchiver_BackfillToExistingBlock(t *testing.T) {
 	require.NoError(t, err)
 
 	// We also have block 1 written to storage
-	err = fs.Write(context.Background(), storage.BlobData{
+	err = fs.WriteBlob(context.Background(), storage.BlobData{
 		Header: storage.Header{
 			BeaconBlockHash: blobtest.One,
 		},
@@ -156,11 +156,90 @@ func TestArchiver_BackfillToExistingBlock(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, exists)
 
-		data, err := fs.Read(context.Background(), blob)
+		data, err := fs.ReadBlob(context.Background(), blob)
 		require.NoError(t, err)
 		require.NotNil(t, data)
 		require.Equal(t, data.BlobSidecars.Data, beacon.Blobs[blob.String()])
 	}
+}
+
+func TestArchiver_BackfillFinishOldProcess(t *testing.T) {
+	beacon := beacontest.NewDefaultStubBeaconClient(t)
+	svc, fs := setup(t, beacon)
+
+	// We have the current head, which is block 5 written to storage
+	err := fs.WriteBlob(context.Background(), storage.BlobData{
+		Header: storage.Header{
+			BeaconBlockHash: blobtest.Five,
+		},
+		BlobSidecars: storage.BlobSidecars{
+			Data: beacon.Blobs[blobtest.Five.String()],
+		},
+	})
+	require.NoError(t, err)
+
+	// We also have block 3 written to storage
+	err = fs.WriteBlob(context.Background(), storage.BlobData{
+		Header: storage.Header{
+			BeaconBlockHash: blobtest.Three,
+		},
+		BlobSidecars: storage.BlobSidecars{
+			Data: beacon.Blobs[blobtest.Three.String()],
+		},
+	})
+	require.NoError(t, err)
+
+	// We also have block 1 written to storage
+	err = fs.WriteBlob(context.Background(), storage.BlobData{
+		Header: storage.Header{
+			BeaconBlockHash: blobtest.One,
+		},
+		BlobSidecars: storage.BlobSidecars{
+			Data: beacon.Blobs[blobtest.One.String()],
+		},
+	})
+	require.NoError(t, err)
+
+	// We expect to backfill blob 4 first, then 2 in a separate process
+	expectedBlobs := []common.Hash{blobtest.Four, blobtest.Two}
+
+	for _, blob := range expectedBlobs {
+		exists, err := fs.Exists(context.Background(), blob)
+		require.NoError(t, err)
+		require.False(t, exists)
+	}
+
+	actualProcesses, err := svc.dataStoreClient.ReadBackfillProcesses(context.Background())
+	expectedProcesses := make(storage.BackfillProcesses)
+	require.NoError(t, err)
+	require.Equal(t, expectedProcesses, actualProcesses)
+
+	expectedProcesses[blobtest.Three] = storage.BackfillProcess{Start: *beacon.Headers[blobtest.Three.String()], Current: *beacon.Headers[blobtest.Three.String()]}
+	err = svc.dataStoreClient.WriteBackfillProcesses(context.Background(), expectedProcesses)
+	require.NoError(t, err)
+
+	actualProcesses, err = svc.dataStoreClient.ReadBackfillProcesses(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, expectedProcesses, actualProcesses)
+
+	svc.backfillBlobs(context.Background(), beacon.Headers[blobtest.Five.String()])
+
+	for _, blob := range expectedBlobs {
+		exists, err := fs.Exists(context.Background(), blob)
+		require.NoError(t, err)
+		require.True(t, exists)
+
+		data, err := fs.ReadBlob(context.Background(), blob)
+		require.NoError(t, err)
+		require.NotNil(t, data)
+		require.Equal(t, data.BlobSidecars.Data, beacon.Blobs[blob.String()])
+	}
+
+	actualProcesses, err = svc.dataStoreClient.ReadBackfillProcesses(context.Background())
+	require.NoError(t, err)
+	svc.log.Info("backfill processes", "processes", actualProcesses)
+	require.Equal(t, storage.BackfillProcesses{}, actualProcesses)
+
 }
 
 func TestArchiver_LatestStopsAtExistingBlock(t *testing.T) {

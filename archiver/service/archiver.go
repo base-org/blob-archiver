@@ -119,7 +119,7 @@ func (a *Archiver) persistBlobsForBlockToS3(ctx context.Context, blockIdentifier
 	}
 
 	// The blob that is being written has not been validated. It is assumed that the beacon node is trusted.
-	err = a.dataStoreClient.Write(ctx, blobData)
+	err = a.dataStoreClient.WriteBlob(ctx, blobData)
 
 	if err != nil {
 		a.log.Error("failed to write blob", "err", err)
@@ -135,32 +135,66 @@ func (a *Archiver) persistBlobsForBlockToS3(ctx context.Context, blockIdentifier
 // to the archivers storage or the origin block in the configuration. This is used to ensure that any gaps can be filled.
 // If an error is encountered persisting a block, it will retry after waiting for a period of time.
 func (a *Archiver) backfillBlobs(ctx context.Context, latest *v1.BeaconBlockHeader) {
-	current, alreadyExists, err := latest, false, error(nil)
+	// Add backfill process that starts at latest slot, then loop through all backfill processes
+	backfillProcesses, err := a.dataStoreClient.ReadBackfillProcesses(ctx)
+	if err != nil {
+		a.log.Crit("failed to read backfill_processes", "err", err)
+	}
+	backfillProcesses[common.Hash(latest.Root)] = storage.BackfillProcess{Start: *latest, Current: *latest}
+	a.dataStoreClient.WriteBackfillProcesses(ctx, backfillProcesses)
 
-	defer func() {
-		a.log.Info("backfill complete", "endHash", current.Root.String(), "startHash", latest.Root.String())
-	}()
+	backfillLoop := func(start *v1.BeaconBlockHeader, current *v1.BeaconBlockHeader) {
+		curr, alreadyExists, err := current, false, error(nil)
+		count := 0
+		a.log.Info("backfill process initiated",
+			"currHash", curr.Root.String(),
+			"currSlot", curr.Header.Message.Slot,
+			"startHash", start.Root.String(),
+			"startSlot", start.Header.Message.Slot,
+		)
 
-	for !alreadyExists {
-		previous := current
+		defer func() {
+			a.log.Info("backfill process complete",
+				"endHash", curr.Root.String(),
+				"endSlot", curr.Header.Message.Slot,
+				"startHash", start.Root.String(),
+				"startSlot", start.Header.Message.Slot,
+			)
+			delete(backfillProcesses, common.Hash(start.Root))
+			a.dataStoreClient.WriteBackfillProcesses(ctx, backfillProcesses)
+		}()
 
-		if common.Hash(current.Root) == a.cfg.OriginBlock {
-			a.log.Info("reached origin block", "hash", current.Root.String())
-			return
+		for !alreadyExists {
+			previous := curr
+
+			if common.Hash(curr.Root) == a.cfg.OriginBlock {
+				a.log.Info("reached origin block", "hash", curr.Root.String())
+				return
+			}
+
+			curr, alreadyExists, err = a.persistBlobsForBlockToS3(ctx, previous.Header.Message.ParentRoot.String(), false)
+			if err != nil {
+				a.log.Error("failed to persist blobs for block, will retry", "err", err, "hash", previous.Header.Message.ParentRoot.String())
+				// Revert back to block we failed to fetch
+				curr = previous
+				time.Sleep(backfillErrorRetryInterval)
+				continue
+			}
+
+			if !alreadyExists {
+				a.metrics.RecordProcessedBlock(metrics.BlockSourceBackfill)
+			}
+
+			count++
+			if count%10 == 0 {
+				backfillProcesses[common.Hash(start.Root)] = storage.BackfillProcess{Start: *start, Current: *curr}
+				a.dataStoreClient.WriteBackfillProcesses(ctx, backfillProcesses)
+			}
 		}
+	}
 
-		current, alreadyExists, err = a.persistBlobsForBlockToS3(ctx, previous.Header.Message.ParentRoot.String(), false)
-		if err != nil {
-			a.log.Error("failed to persist blobs for block, will retry", "err", err, "hash", previous.Header.Message.ParentRoot.String())
-			// Revert back to block we failed to fetch
-			current = previous
-			time.Sleep(backfillErrorRetryInterval)
-			continue
-		}
-
-		if !alreadyExists {
-			a.metrics.RecordProcessedBlock(metrics.BlockSourceBackfill)
-		}
+	for _, process := range backfillProcesses {
+		backfillLoop(&process.Start, &process.Current)
 	}
 }
 
