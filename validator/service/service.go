@@ -21,8 +21,6 @@ import (
 var ErrAlreadyStopped = errors.New("already stopped")
 
 const (
-	// 5 blocks per minute, 120 minutes
-	twoHoursOfBlocks = 5 * 120
 	// finalized l1 offset
 	finalizedL1Offset = 64
 	// Known log for any validation errors
@@ -31,23 +29,25 @@ const (
 	retryAttempts = 10
 )
 
-func NewValidator(l log.Logger, headerClient client.BeaconBlockHeadersProvider, beaconAPI BlobSidecarClient, blobAPI BlobSidecarClient, app context.CancelCauseFunc) *ValidatorService {
+func NewValidator(l log.Logger, headerClient client.BeaconBlockHeadersProvider, beaconAPI BlobSidecarClient, blobAPI BlobSidecarClient, app context.CancelCauseFunc, hoursOfBlocks int) *ValidatorService {
 	return &ValidatorService{
-		log:          l,
-		headerClient: headerClient,
-		beaconAPI:    beaconAPI,
-		blobAPI:      blobAPI,
-		closeApp:     app,
+		log:           l,
+		headerClient:  headerClient,
+		beaconAPI:     beaconAPI,
+		blobAPI:       blobAPI,
+		closeApp:      app,
+		hoursOfBlocks: hoursOfBlocks,
 	}
 }
 
 type ValidatorService struct {
-	stopped      atomic.Bool
-	log          log.Logger
-	headerClient client.BeaconBlockHeadersProvider
-	beaconAPI    BlobSidecarClient
-	blobAPI      BlobSidecarClient
-	closeApp     context.CancelCauseFunc
+	stopped       atomic.Bool
+	log           log.Logger
+	headerClient  client.BeaconBlockHeadersProvider
+	beaconAPI     BlobSidecarClient
+	blobAPI       BlobSidecarClient
+	closeApp      context.CancelCauseFunc
+	hoursOfBlocks int
 }
 
 // Start starts the validator service. This will fetch the current range of blocks to validate and start the validation
@@ -64,7 +64,7 @@ func (a *ValidatorService) Start(ctx context.Context) error {
 	}
 
 	end := header.Data.Header.Message.Slot - finalizedL1Offset
-	start := end - twoHoursOfBlocks
+	start := end - phase0.Slot(a.hoursOfBlocks)
 
 	go a.checkBlobs(ctx, start, end)
 

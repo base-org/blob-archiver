@@ -10,9 +10,11 @@ import (
 )
 
 type ValidatorConfig struct {
-	LogConfig    oplog.CLIConfig
-	BeaconConfig common.BeaconConfig
-	BlobConfig   common.BeaconConfig
+	LogConfig             oplog.CLIConfig
+	BeaconConfig          common.BeaconConfig
+	BlobConfig            common.BeaconConfig
+	BlocksPerMinuteConfig int
+	HoursOfBlobDataConfig int
 }
 
 func (c ValidatorConfig) Check() error {
@@ -22,6 +24,14 @@ func (c ValidatorConfig) Check() error {
 
 	if err := c.BlobConfig.Check(); err != nil {
 		return fmt.Errorf("blob config check failed: %w", err)
+	}
+
+	if c.BlocksPerMinuteConfig <= 0 {
+		return fmt.Errorf("blocks per minute must be greater than 0")
+	}
+
+	if c.HoursOfBlobDataConfig <= 0 {
+		return fmt.Errorf("hours of blob data must be greater than 0")
 	}
 
 	return nil
@@ -40,5 +50,7 @@ func ReadConfig(cliCtx *cli.Context) ValidatorConfig {
 			BeaconURL:           cliCtx.String(BlobApiClientUrlFlag.Name),
 			BeaconClientTimeout: timeout,
 		},
+		BlocksPerMinuteConfig: cliCtx.Int(BeaconClientTimeoutFlag.Name),
+		HoursOfBlobDataConfig: cliCtx.Int(HoursOfBlobDataClientFlag.Name),
 	}
 }

@@ -27,6 +27,20 @@ var (
 		Required: true,
 		EnvVars:  opservice.PrefixEnvVar(EnvVarPrefix, "BLOB_API_HTTP"),
 	}
+	BlocksPerMinuteClientFlag = &cli.IntFlag{
+		Name:     "blocks-per-minute",
+		Usage:    "The number of blocks per minute",
+		Value:    5,
+		Required: true,
+		EnvVars:  opservice.PrefixEnvVar(EnvVarPrefix, "BLOCKS_PER_MINUTE"),
+	}
+	HoursOfBlobDataClientFlag = &cli.IntFlag{
+		Name:     "hours-of-blob-data",
+		Usage:    "The number of hours of blob data to fetch",
+		Value:    2,
+		Required: true,
+		EnvVars:  opservice.PrefixEnvVar(EnvVarPrefix, "HOURS_OF_BLOB_DATA"),
+	}
 )
 
 func init() {
