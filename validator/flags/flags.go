@@ -38,7 +38,7 @@ var (
 
 func init() {
 	Flags = append(Flags, oplog.CLIFlags(EnvVarPrefix)...)
-	Flags = append(Flags, BeaconClientTimeoutFlag, L1BeaconClientUrlFlag, BlobApiClientUrlFlag)
+	Flags = append(Flags, BeaconClientTimeoutFlag, L1BeaconClientUrlFlag, BlobApiClientUrlFlag, NumBlocksClientFlag)
 }
 
 // Flags contains the list of configuration options available to the binary.
