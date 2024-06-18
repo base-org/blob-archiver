@@ -124,7 +124,7 @@ func (s *S3Storage) ReadBackfillProcesses(ctx context.Context) (BackfillProcesse
 		return BackfillProcesses{}, ErrStorage
 	}
 	defer res.Close()
-	stat, err := res.Stat()
+	_, err = res.Stat()
 	if err != nil {
 		errResponse := minio.ToErrorResponse(err)
 		if errResponse.Code == "NoSuchKey" {
@@ -138,14 +138,6 @@ func (s *S3Storage) ReadBackfillProcesses(ctx context.Context) (BackfillProcesse
 
 	var reader io.ReadCloser = res
 	defer reader.Close()
-
-	if stat.Metadata.Get("Content-Encoding") == "gzip" {
-		reader, err = gzip.NewReader(reader)
-		if err != nil {
-			s.log.Warn("error creating gzip reader", "err", err)
-			return BackfillProcesses{}, ErrMarshaling
-		}
-	}
 
 	var data BackfillProcesses
 	err = json.NewDecoder(reader).Decode(&data)
