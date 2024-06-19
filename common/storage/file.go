@@ -23,10 +23,19 @@ func NewFileStorage(dir string, l log.Logger) *FileStorage {
 
 	_, err := storage.ReadBackfillProcesses(context.Background())
 	if err == ErrNotFound {
-		storage.log.Info("creating empty backfill_processes object")
+		storage.log.Info("creating empty backfill_processes file")
 		err = storage.WriteBackfillProcesses(context.Background(), BackfillProcesses{})
 		if err != nil {
-			storage.log.Crit("failed to create backfill_processes file")
+			storage.log.Crit("failed to create empty backfill_processes file", "err", err)
+		}
+	}
+
+	_, err = storage.ReadLockfile(context.Background())
+	if err == ErrNotFound {
+		storage.log.Info("creating empty lockfile file")
+		err = storage.WriteLockfile(context.Background(), Lockfile{})
+		if err != nil {
+			storage.log.Crit("failed to create empty lockfile file", "err", err)
 		}
 	}
 
@@ -83,6 +92,24 @@ func (s *FileStorage) ReadBackfillProcesses(ctx context.Context) (BackfillProces
 	return result, nil
 }
 
+func (s *FileStorage) ReadLockfile(ctx context.Context) (Lockfile, error) {
+	data, err := os.ReadFile(path.Join(s.directory, "lockfile"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return Lockfile{}, ErrNotFound
+		}
+
+		return Lockfile{}, err
+	}
+	var result Lockfile
+	err = json.Unmarshal(data, &result)
+	if err != nil {
+		s.log.Warn("error decoding lockfile", "err", err)
+		return Lockfile{}, ErrMarshaling
+	}
+	return result, nil
+}
+
 func (s *FileStorage) WriteBackfillProcesses(_ context.Context, data BackfillProcesses) error {
 	BackfillMu.Lock()
 	defer BackfillMu.Unlock()
@@ -99,6 +126,22 @@ func (s *FileStorage) WriteBackfillProcesses(_ context.Context, data BackfillPro
 	}
 
 	s.log.Info("wrote backfill_processes")
+	return nil
+}
+
+func (s *FileStorage) WriteLockfile(_ context.Context, data Lockfile) error {
+	b, err := json.Marshal(data)
+	if err != nil {
+		s.log.Warn("error encoding lockfile", "err", err)
+		return ErrMarshaling
+	}
+	err = os.WriteFile(path.Join(s.directory, "lockfile"), b, 0644)
+	if err != nil {
+		s.log.Warn("error writing lockfile", "err", err)
+		return err
+	}
+
+	s.log.Info("wrote to lockfile", "archiverId", data.ArchiverId, "timestamp", data.Timestamp)
 	return nil
 }
 

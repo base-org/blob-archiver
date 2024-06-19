@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/google/uuid"
 )
 
 const (
@@ -37,6 +38,7 @@ func NewArchiver(l log.Logger, cfg flags.ArchiverConfig, dataStoreClient storage
 		metrics:         m,
 		beaconClient:    client,
 		stopCh:          make(chan struct{}),
+		id:              uuid.New().String(),
 	}, nil
 }
 
@@ -47,6 +49,7 @@ type Archiver struct {
 	beaconClient    BeaconClient
 	metrics         metrics.Metricer
 	stopCh          chan struct{}
+	id              string
 }
 
 // Start starts archiving blobs. It begins polling the beacon node for the latest blocks and persisting blobs for
@@ -62,6 +65,8 @@ func (a *Archiver) Start(ctx context.Context) error {
 		a.log.Error("failed to seed archiver with initial block", "err", err)
 		return err
 	}
+
+	a.waitObtainStorageLock(ctx)
 
 	go a.backfillBlobs(ctx, currentBlock)
 
@@ -129,6 +134,56 @@ func (a *Archiver) persistBlobsForBlockToS3(ctx context.Context, blockIdentifier
 	a.metrics.RecordStoredBlobs(len(blobSidecars.Data))
 
 	return currentHeader.Data, exists, nil
+}
+
+const (
+	LockUpdateInterval      = 10 * time.Second
+	ObtainLockRetryInterval = 10 * time.Second
+	LockTimeout             = int64(20) // 20 seconds
+)
+
+func (a *Archiver) waitObtainStorageLock(ctx context.Context) {
+	lockfile, err := a.dataStoreClient.ReadLockfile(ctx)
+	if err != nil {
+		a.log.Crit("failed to read lockfile", "err", err)
+	}
+
+	currentTime := time.Now().Unix()
+	emptyLockfile := storage.Lockfile{}
+	if lockfile != emptyLockfile {
+		for lockfile.ArchiverId != a.id && lockfile.Timestamp+LockTimeout > currentTime {
+			// Loop until the timestamp read from storage is expired
+			time.Sleep(ObtainLockRetryInterval)
+			lockfile, err = a.dataStoreClient.ReadLockfile(ctx)
+			if err != nil {
+				a.log.Crit("failed to read lockfile", "err", err)
+			}
+			currentTime = time.Now().Unix()
+		}
+	}
+
+	err = a.dataStoreClient.WriteLockfile(ctx, storage.Lockfile{ArchiverId: a.id, Timestamp: currentTime})
+	if err != nil {
+		a.log.Crit("failed to write to lockfile: %v", err)
+	}
+
+	go func() {
+		// Retain storage lock by continually updating the stored timestamp
+		ticker := time.NewTicker(LockUpdateInterval)
+		for {
+			select {
+			case <-ticker.C:
+				currentTime := time.Now().Unix()
+				err := a.dataStoreClient.WriteLockfile(ctx, storage.Lockfile{ArchiverId: a.id, Timestamp: currentTime})
+				if err != nil {
+					a.log.Error("failed to update lockfile timestamp", "err", err)
+				}
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			}
+		}
+	}()
 }
 
 // backfillBlobs will persist all blobs from the provided beacon block header, to either the last block that was persisted

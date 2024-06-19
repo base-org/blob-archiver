@@ -57,6 +57,15 @@ func NewS3Storage(cfg flags.S3Config, l log.Logger) (*S3Storage, error) {
 		}
 	}
 
+	_, err = storage.ReadLockfile(context.Background())
+	if err == ErrNotFound {
+		storage.log.Info("creating empty lockfile object")
+		err = storage.WriteLockfile(context.Background(), Lockfile{})
+		if err != nil {
+			log.Crit("failed to create backfill_processes key")
+		}
+	}
+
 	return storage, nil
 }
 
@@ -149,6 +158,38 @@ func (s *S3Storage) ReadBackfillProcesses(ctx context.Context) (BackfillProcesse
 	return data, nil
 }
 
+func (s *S3Storage) ReadLockfile(ctx context.Context) (Lockfile, error) {
+	res, err := s.s3.GetObject(ctx, s.bucket, path.Join(s.path, "lockfile"), minio.GetObjectOptions{})
+	if err != nil {
+		s.log.Info("unexpected error fetching lockfile", "err", err)
+		return Lockfile{}, ErrStorage
+	}
+	defer res.Close()
+	_, err = res.Stat()
+	if err != nil {
+		errResponse := minio.ToErrorResponse(err)
+		if errResponse.Code == "NoSuchKey" {
+			s.log.Info("unable to find lockfile key")
+			return Lockfile{}, ErrNotFound
+		} else {
+			s.log.Info("unexpected error fetching lockfile", "err", err)
+			return Lockfile{}, ErrStorage
+		}
+	}
+
+	var reader io.ReadCloser = res
+	defer reader.Close()
+
+	var data Lockfile
+	err = json.NewDecoder(reader).Decode(&data)
+	if err != nil {
+		s.log.Warn("error decoding lockfile", "err", err)
+		return Lockfile{}, ErrMarshaling
+	}
+
+	return data, nil
+}
+
 func (s *S3Storage) WriteBackfillProcesses(ctx context.Context, data BackfillProcesses) error {
 	BackfillMu.Lock()
 	defer BackfillMu.Unlock()
@@ -171,6 +212,28 @@ func (s *S3Storage) WriteBackfillProcesses(ctx context.Context, data BackfillPro
 	}
 
 	s.log.Info("wrote to backfill_processes")
+	return nil
+}
+
+func (s *S3Storage) WriteLockfile(ctx context.Context, data Lockfile) error {
+	d, err := json.Marshal(data)
+	if err != nil {
+		s.log.Warn("error encoding lockfile", "err", err)
+		return ErrMarshaling
+	}
+
+	options := minio.PutObjectOptions{
+		ContentType: "application/json",
+	}
+	reader := bytes.NewReader(d)
+
+	_, err = s.s3.PutObject(ctx, s.bucket, path.Join(s.path, "lockfile"), reader, int64(len(d)), options)
+	if err != nil {
+		s.log.Warn("error writing to lockfile", "err", err)
+		return ErrStorage
+	}
+
+	s.log.Info("wrote to lockfile", "archiverId", data.ArchiverId, "timestamp", data.Timestamp)
 	return nil
 }
 

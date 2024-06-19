@@ -71,6 +71,11 @@ type BackfillProcess struct {
 	Current v1.BeaconBlockHeader `json:"current_block"`
 }
 
+type Lockfile struct {
+	ArchiverId string `json:"archiver_id"`
+	Timestamp  int64  `json:"timestamp"`
+}
+
 // BackfillProcesses maps backfill start block hash --> BackfillProcess. This allows us to track
 // multiple processes and reengage a previous backfill in case an archiver restart interrupted
 // an active backfill
@@ -91,6 +96,7 @@ type DataStoreReader interface {
 	// - ErrMarshaling: there was an error decoding the blob data.
 	ReadBlob(ctx context.Context, hash common.Hash) (BlobData, error)
 	ReadBackfillProcesses(ctx context.Context) (BackfillProcesses, error)
+	ReadLockfile(ctx context.Context) (Lockfile, error)
 }
 
 // DataStoreWriter is the interface for writing to a data store.
@@ -101,6 +107,7 @@ type DataStoreWriter interface {
 	// - ErrMarshaling: there was an error encoding the blob data.
 	WriteBlob(ctx context.Context, data BlobData) error
 	WriteBackfillProcesses(ctx context.Context, data BackfillProcesses) error
+	WriteLockfile(ctx context.Context, data Lockfile) error
 }
 
 // DataStore is the interface for a data store that can be both written to and read from.
