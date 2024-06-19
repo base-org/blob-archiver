@@ -153,6 +153,7 @@ func (a *Archiver) waitObtainStorageLock(ctx context.Context) {
 	if lockfile != emptyLockfile {
 		for lockfile.ArchiverId != a.id && lockfile.Timestamp+LockTimeout > currentTime {
 			// Loop until the timestamp read from storage is expired
+			a.log.Info("attempting to obtain storage lock")
 			time.Sleep(ObtainLockRetryInterval)
 			lockfile, err = a.dataStoreClient.ReadLockfile(ctx)
 			if err != nil {
@@ -166,6 +167,7 @@ func (a *Archiver) waitObtainStorageLock(ctx context.Context) {
 	if err != nil {
 		a.log.Crit("failed to write to lockfile: %v", err)
 	}
+	a.log.Info("obtained storage lock")
 
 	go func() {
 		// Retain storage lock by continually updating the stored timestamp
