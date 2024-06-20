@@ -163,6 +163,24 @@ func TestArchiver_BackfillToExistingBlock(t *testing.T) {
 	}
 }
 
+func TestArchiver_ObtainLockfile(t *testing.T) {
+	beacon := beacontest.NewDefaultStubBeaconClient(t)
+	svc, _ := setup(t, beacon)
+
+	currentTime := time.Now().Unix()
+	expiredTime := currentTime - 19
+	err := svc.dataStoreClient.WriteLockfile(context.Background(), storage.Lockfile{ArchiverId: "FAKEID", Timestamp: expiredTime})
+	require.NoError(t, err)
+
+	ObtainLockRetryInterval = 1 * time.Second
+	svc.waitObtainStorageLock(context.Background())
+
+	lockfile, err := svc.dataStoreClient.ReadLockfile(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, svc.id, lockfile.ArchiverId)
+	require.True(t, lockfile.Timestamp >= currentTime)
+}
+
 func TestArchiver_BackfillFinishOldProcess(t *testing.T) {
 	beacon := beacontest.NewDefaultStubBeaconClient(t)
 	svc, fs := setup(t, beacon)

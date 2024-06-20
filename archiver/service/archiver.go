@@ -136,11 +136,9 @@ func (a *Archiver) persistBlobsForBlockToS3(ctx context.Context, blockIdentifier
 	return currentHeader.Data, exists, nil
 }
 
-const (
-	LockUpdateInterval      = 10 * time.Second
-	ObtainLockRetryInterval = 10 * time.Second
-	LockTimeout             = int64(20) // 20 seconds
-)
+const LockUpdateInterval = 10 * time.Second
+const LockTimeout = int64(20) // 20 seconds
+var ObtainLockRetryInterval = 10 * time.Second
 
 func (a *Archiver) waitObtainStorageLock(ctx context.Context) {
 	lockfile, err := a.dataStoreClient.ReadLockfile(ctx)
@@ -153,7 +151,10 @@ func (a *Archiver) waitObtainStorageLock(ctx context.Context) {
 	if lockfile != emptyLockfile {
 		for lockfile.ArchiverId != a.id && lockfile.Timestamp+LockTimeout > currentTime {
 			// Loop until the timestamp read from storage is expired
-			a.log.Info("attempting to obtain storage lock")
+			a.log.Info("waiting for storage lock timestamp to expire",
+				"timestamp", strconv.FormatInt(lockfile.Timestamp, 10),
+				"currentTime", strconv.FormatInt(currentTime, 10),
+			)
 			time.Sleep(ObtainLockRetryInterval)
 			lockfile, err = a.dataStoreClient.ReadLockfile(ctx)
 			if err != nil {
