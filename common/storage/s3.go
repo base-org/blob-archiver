@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"path"
+	"strconv"
 
 	"github.com/base-org/blob-archiver/common/flags"
 	"github.com/ethereum/go-ethereum/common"
@@ -233,7 +234,7 @@ func (s *S3Storage) WriteLockfile(ctx context.Context, data Lockfile) error {
 		return ErrStorage
 	}
 
-	s.log.Info("wrote to lockfile", "archiverId", data.ArchiverId, "timestamp", data.Timestamp)
+	s.log.Info("wrote to lockfile", "archiverId", data.ArchiverId, "timestamp", strconv.FormatInt(data.Timestamp, 10))
 	return nil
 }
 

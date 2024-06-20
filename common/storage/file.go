@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -141,7 +142,7 @@ func (s *FileStorage) WriteLockfile(_ context.Context, data Lockfile) error {
 		return err
 	}
 
-	s.log.Info("wrote to lockfile", "archiverId", data.ArchiverId, "timestamp", data.Timestamp)
+	s.log.Info("wrote to lockfile", "archiverId", data.ArchiverId, "timestamp", strconv.FormatInt(data.Timestamp, 10))
 	return nil
 }
 
