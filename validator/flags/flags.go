@@ -27,11 +27,18 @@ var (
 		Required: true,
 		EnvVars:  opservice.PrefixEnvVar(EnvVarPrefix, "BLOB_API_HTTP"),
 	}
+	NumBlocksClientFlag = &cli.IntFlag{
+		Name:     "num-blocks",
+		Usage:    "The number of blocks to read blob data for",
+		Value:    600,
+		Required: true,
+		EnvVars:  opservice.PrefixEnvVar(EnvVarPrefix, "NUM_BLOCKS"),
+	}
 )
 
 func init() {
 	Flags = append(Flags, oplog.CLIFlags(EnvVarPrefix)...)
-	Flags = append(Flags, BeaconClientTimeoutFlag, L1BeaconClientUrlFlag, BlobApiClientUrlFlag)
+	Flags = append(Flags, BeaconClientTimeoutFlag, L1BeaconClientUrlFlag, BlobApiClientUrlFlag, NumBlocksClientFlag)
 }
 
 // Flags contains the list of configuration options available to the binary.
