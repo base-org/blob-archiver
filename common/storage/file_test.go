@@ -29,7 +29,7 @@ func runTestExists(t *testing.T, s DataStore) {
 	require.NoError(t, err)
 	require.False(t, exists)
 
-	err = s.Write(context.Background(), BlobData{
+	err = s.WriteBlob(context.Background(), BlobData{
 		Header: Header{
 			BeaconBlockHash: id,
 		},
@@ -52,11 +52,11 @@ func TestExists(t *testing.T) {
 func runTestRead(t *testing.T, s DataStore) {
 	id := common.Hash{1, 2, 3}
 
-	_, err := s.Read(context.Background(), id)
+	_, err := s.ReadBlob(context.Background(), id)
 	require.Error(t, err)
 	require.True(t, errors.Is(err, ErrNotFound))
 
-	err = s.Write(context.Background(), BlobData{
+	err = s.WriteBlob(context.Background(), BlobData{
 		Header: Header{
 			BeaconBlockHash: id,
 		},
@@ -64,7 +64,7 @@ func runTestRead(t *testing.T, s DataStore) {
 	})
 	require.NoError(t, err)
 
-	data, err := s.Read(context.Background(), id)
+	data, err := s.ReadBlob(context.Background(), id)
 	require.NoError(t, err)
 	require.Equal(t, id, data.Header.BeaconBlockHash)
 }
@@ -84,14 +84,14 @@ func TestBrokenStorage(t *testing.T) {
 	// Delete the directory to simulate broken storage
 	cleanup()
 
-	_, err := fs.Read(context.Background(), id)
+	_, err := fs.ReadBlob(context.Background(), id)
 	require.Error(t, err)
 
 	exists, err := fs.Exists(context.Background(), id)
 	require.False(t, exists)
 	require.NoError(t, err) // No error should be returned, as in this test we've just delted the directory
 
-	err = fs.Write(context.Background(), BlobData{
+	err = fs.WriteBlob(context.Background(), BlobData{
 		Header: Header{
 			BeaconBlockHash: id,
 		},
@@ -109,7 +109,7 @@ func TestReadInvalidData(t *testing.T) {
 	err := os.WriteFile(fs.fileName(id), []byte("invalid json"), 0644)
 	require.NoError(t, err)
 
-	_, err = fs.Read(context.Background(), id)
+	_, err = fs.ReadBlob(context.Background(), id)
 	require.Error(t, err)
 	require.True(t, errors.Is(err, ErrMarshaling))
 }

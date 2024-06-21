@@ -92,10 +92,10 @@ func TestAPIService(t *testing.T) {
 		},
 	}
 
-	err := fs.Write(context.Background(), blockOne)
+	err := fs.WriteBlob(context.Background(), blockOne)
 	require.NoError(t, err)
 
-	err = fs.Write(context.Background(), blockTwo)
+	err = fs.WriteBlob(context.Background(), blockTwo)
 	require.NoError(t, err)
 
 	beaconClient.Headers["finalized"] = &v1.BeaconBlockHeader{

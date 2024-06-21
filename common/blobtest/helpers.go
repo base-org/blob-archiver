@@ -17,6 +17,8 @@ var (
 	Three       = common.Hash{3}
 	Four        = common.Hash{4}
 	Five        = common.Hash{5}
+	Six         = common.Hash{6}
+	Seven       = common.Hash{7}
 
 	StartSlot = uint64(10)
 	EndSlot   = uint64(15)

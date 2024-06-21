@@ -26,13 +26,13 @@ func (s *TestFileStorage) WritesFailTimes(times int) {
 	s.writeFailCount = times
 }
 
-func (s *TestFileStorage) Write(_ context.Context, data storage.BlobData) error {
+func (s *TestFileStorage) WriteBlob(_ context.Context, data storage.BlobData) error {
 	if s.writeFailCount > 0 {
 		s.writeFailCount--
 		return storage.ErrStorage
 	}
 
-	return s.FileStorage.Write(context.Background(), data)
+	return s.FileStorage.WriteBlob(context.Background(), data)
 }
 
 func (fs *TestFileStorage) CheckExistsOrFail(t *testing.T, hash common.Hash) {
@@ -48,12 +48,12 @@ func (fs *TestFileStorage) CheckNotExistsOrFail(t *testing.T, hash common.Hash) 
 }
 
 func (fs *TestFileStorage) WriteOrFail(t *testing.T, data storage.BlobData) {
-	err := fs.Write(context.Background(), data)
+	err := fs.WriteBlob(context.Background(), data)
 	require.NoError(t, err)
 }
 
 func (fs *TestFileStorage) ReadOrFail(t *testing.T, hash common.Hash) storage.BlobData {
-	data, err := fs.Read(context.Background(), hash)
+	data, err := fs.ReadBlob(context.Background(), hash)
 	require.NoError(t, err)
 	require.NotNil(t, data)
 	return data

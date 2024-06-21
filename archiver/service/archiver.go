@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/google/uuid"
 )
 
 const (
@@ -37,6 +38,7 @@ func NewArchiver(l log.Logger, cfg flags.ArchiverConfig, dataStoreClient storage
 		metrics:         m,
 		beaconClient:    client,
 		stopCh:          make(chan struct{}),
+		id:              uuid.New().String(),
 	}, nil
 }
 
@@ -47,6 +49,7 @@ type Archiver struct {
 	beaconClient    BeaconClient
 	metrics         metrics.Metricer
 	stopCh          chan struct{}
+	id              string
 }
 
 // Start starts archiving blobs. It begins polling the beacon node for the latest blocks and persisting blobs for
@@ -62,6 +65,8 @@ func (a *Archiver) Start(ctx context.Context) error {
 		a.log.Error("failed to seed archiver with initial block", "err", err)
 		return err
 	}
+
+	a.waitObtainStorageLock(ctx)
 
 	go a.backfillBlobs(ctx, currentBlock)
 
@@ -119,7 +124,7 @@ func (a *Archiver) persistBlobsForBlockToS3(ctx context.Context, blockIdentifier
 	}
 
 	// The blob that is being written has not been validated. It is assumed that the beacon node is trusted.
-	err = a.dataStoreClient.Write(ctx, blobData)
+	err = a.dataStoreClient.WriteBlob(ctx, blobData)
 
 	if err != nil {
 		a.log.Error("failed to write blob", "err", err)
@@ -131,36 +136,123 @@ func (a *Archiver) persistBlobsForBlockToS3(ctx context.Context, blockIdentifier
 	return currentHeader.Data, exists, nil
 }
 
+const LockUpdateInterval = 10 * time.Second
+const LockTimeout = int64(20) // 20 seconds
+var ObtainLockRetryInterval = 10 * time.Second
+
+func (a *Archiver) waitObtainStorageLock(ctx context.Context) {
+	lockfile, err := a.dataStoreClient.ReadLockfile(ctx)
+	if err != nil {
+		a.log.Crit("failed to read lockfile", "err", err)
+	}
+
+	currentTime := time.Now().Unix()
+	emptyLockfile := storage.Lockfile{}
+	if lockfile != emptyLockfile {
+		for lockfile.ArchiverId != a.id && lockfile.Timestamp+LockTimeout > currentTime {
+			// Loop until the timestamp read from storage is expired
+			a.log.Info("waiting for storage lock timestamp to expire",
+				"timestamp", strconv.FormatInt(lockfile.Timestamp, 10),
+				"currentTime", strconv.FormatInt(currentTime, 10),
+			)
+			time.Sleep(ObtainLockRetryInterval)
+			lockfile, err = a.dataStoreClient.ReadLockfile(ctx)
+			if err != nil {
+				a.log.Crit("failed to read lockfile", "err", err)
+			}
+			currentTime = time.Now().Unix()
+		}
+	}
+
+	err = a.dataStoreClient.WriteLockfile(ctx, storage.Lockfile{ArchiverId: a.id, Timestamp: currentTime})
+	if err != nil {
+		a.log.Crit("failed to write to lockfile: %v", err)
+	}
+	a.log.Info("obtained storage lock")
+
+	go func() {
+		// Retain storage lock by continually updating the stored timestamp
+		ticker := time.NewTicker(LockUpdateInterval)
+		for {
+			select {
+			case <-ticker.C:
+				currentTime := time.Now().Unix()
+				err := a.dataStoreClient.WriteLockfile(ctx, storage.Lockfile{ArchiverId: a.id, Timestamp: currentTime})
+				if err != nil {
+					a.log.Error("failed to update lockfile timestamp", "err", err)
+				}
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+}
+
 // backfillBlobs will persist all blobs from the provided beacon block header, to either the last block that was persisted
 // to the archivers storage or the origin block in the configuration. This is used to ensure that any gaps can be filled.
 // If an error is encountered persisting a block, it will retry after waiting for a period of time.
 func (a *Archiver) backfillBlobs(ctx context.Context, latest *v1.BeaconBlockHeader) {
-	current, alreadyExists, err := latest, false, error(nil)
+	// Add backfill process that starts at latest slot, then loop through all backfill processes
+	backfillProcesses, err := a.dataStoreClient.ReadBackfillProcesses(ctx)
+	if err != nil {
+		a.log.Crit("failed to read backfill_processes", "err", err)
+	}
+	backfillProcesses[common.Hash(latest.Root)] = storage.BackfillProcess{Start: *latest, Current: *latest}
+	a.dataStoreClient.WriteBackfillProcesses(ctx, backfillProcesses)
 
-	defer func() {
-		a.log.Info("backfill complete", "endHash", current.Root.String(), "startHash", latest.Root.String())
-	}()
+	backfillLoop := func(start *v1.BeaconBlockHeader, current *v1.BeaconBlockHeader) {
+		curr, alreadyExists, err := current, false, error(nil)
+		count := 0
+		a.log.Info("backfill process initiated",
+			"currHash", curr.Root.String(),
+			"currSlot", curr.Header.Message.Slot,
+			"startHash", start.Root.String(),
+			"startSlot", start.Header.Message.Slot,
+		)
 
-	for !alreadyExists {
-		previous := current
+		defer func() {
+			a.log.Info("backfill process complete",
+				"endHash", curr.Root.String(),
+				"endSlot", curr.Header.Message.Slot,
+				"startHash", start.Root.String(),
+				"startSlot", start.Header.Message.Slot,
+			)
+			delete(backfillProcesses, common.Hash(start.Root))
+			a.dataStoreClient.WriteBackfillProcesses(ctx, backfillProcesses)
+		}()
 
-		if common.Hash(current.Root) == a.cfg.OriginBlock {
-			a.log.Info("reached origin block", "hash", current.Root.String())
-			return
+		for !alreadyExists {
+			previous := curr
+
+			if common.Hash(curr.Root) == a.cfg.OriginBlock {
+				a.log.Info("reached origin block", "hash", curr.Root.String())
+				return
+			}
+
+			curr, alreadyExists, err = a.persistBlobsForBlockToS3(ctx, previous.Header.Message.ParentRoot.String(), false)
+			if err != nil {
+				a.log.Error("failed to persist blobs for block, will retry", "err", err, "hash", previous.Header.Message.ParentRoot.String())
+				// Revert back to block we failed to fetch
+				curr = previous
+				time.Sleep(backfillErrorRetryInterval)
+				continue
+			}
+
+			if !alreadyExists {
+				a.metrics.RecordProcessedBlock(metrics.BlockSourceBackfill)
+			}
+
+			count++
+			if count%10 == 0 {
+				backfillProcesses[common.Hash(start.Root)] = storage.BackfillProcess{Start: *start, Current: *curr}
+				a.dataStoreClient.WriteBackfillProcesses(ctx, backfillProcesses)
+			}
 		}
+	}
 
-		current, alreadyExists, err = a.persistBlobsForBlockToS3(ctx, previous.Header.Message.ParentRoot.String(), false)
-		if err != nil {
-			a.log.Error("failed to persist blobs for block, will retry", "err", err, "hash", previous.Header.Message.ParentRoot.String())
-			// Revert back to block we failed to fetch
-			current = previous
-			time.Sleep(backfillErrorRetryInterval)
-			continue
-		}
-
-		if !alreadyExists {
-			a.metrics.RecordProcessedBlock(metrics.BlockSourceBackfill)
-		}
+	for _, process := range backfillProcesses {
+		backfillLoop(&process.Start, &process.Current)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"path"
+	"strconv"
 
 	"github.com/base-org/blob-archiver/common/flags"
 	"github.com/ethereum/go-ethereum/common"
@@ -40,13 +41,33 @@ func NewS3Storage(cfg flags.S3Config, l log.Logger) (*S3Storage, error) {
 		return nil, err
 	}
 
-	return &S3Storage{
+	storage := &S3Storage{
 		s3:       client,
 		bucket:   cfg.Bucket,
 		path:     cfg.Path,
 		log:      l,
 		compress: cfg.Compress,
-	}, nil
+	}
+
+	_, err = storage.ReadBackfillProcesses(context.Background())
+	if err == ErrNotFound {
+		storage.log.Info("creating empty backfill_processes object")
+		err = storage.WriteBackfillProcesses(context.Background(), BackfillProcesses{})
+		if err != nil {
+			log.Crit("failed to create backfill_processes key")
+		}
+	}
+
+	_, err = storage.ReadLockfile(context.Background())
+	if err == ErrNotFound {
+		storage.log.Info("creating empty lockfile object")
+		err = storage.WriteLockfile(context.Background(), Lockfile{})
+		if err != nil {
+			log.Crit("failed to create backfill_processes key")
+		}
+	}
+
+	return storage, nil
 }
 
 func (s *S3Storage) Exists(ctx context.Context, hash common.Hash) (bool, error) {
@@ -63,7 +84,7 @@ func (s *S3Storage) Exists(ctx context.Context, hash common.Hash) (bool, error) 
 	return true, nil
 }
 
-func (s *S3Storage) Read(ctx context.Context, hash common.Hash) (BlobData, error) {
+func (s *S3Storage) ReadBlob(ctx context.Context, hash common.Hash) (BlobData, error) {
 	res, err := s.s3.GetObject(ctx, s.bucket, path.Join(s.path, hash.String()), minio.GetObjectOptions{})
 	if err != nil {
 		s.log.Info("unexpected error fetching blob", "hash", hash.String(), "err", err)
@@ -103,7 +124,121 @@ func (s *S3Storage) Read(ctx context.Context, hash common.Hash) (BlobData, error
 	return data, nil
 }
 
-func (s *S3Storage) Write(ctx context.Context, data BlobData) error {
+func (s *S3Storage) ReadBackfillProcesses(ctx context.Context) (BackfillProcesses, error) {
+	BackfillMu.Lock()
+	defer BackfillMu.Unlock()
+
+	res, err := s.s3.GetObject(ctx, s.bucket, path.Join(s.path, "backfill_processes"), minio.GetObjectOptions{})
+	if err != nil {
+		s.log.Info("unexpected error fetching backfill_processes", "err", err)
+		return BackfillProcesses{}, ErrStorage
+	}
+	defer res.Close()
+	_, err = res.Stat()
+	if err != nil {
+		errResponse := minio.ToErrorResponse(err)
+		if errResponse.Code == "NoSuchKey" {
+			s.log.Info("unable to find backfill_processes key")
+			return BackfillProcesses{}, ErrNotFound
+		} else {
+			s.log.Info("unexpected error fetching backfill_processes", "err", err)
+			return BackfillProcesses{}, ErrStorage
+		}
+	}
+
+	var reader io.ReadCloser = res
+	defer reader.Close()
+
+	var data BackfillProcesses
+	err = json.NewDecoder(reader).Decode(&data)
+	if err != nil {
+		s.log.Warn("error decoding backfill_processes", "err", err)
+		return BackfillProcesses{}, ErrMarshaling
+	}
+
+	return data, nil
+}
+
+func (s *S3Storage) ReadLockfile(ctx context.Context) (Lockfile, error) {
+	res, err := s.s3.GetObject(ctx, s.bucket, path.Join(s.path, "lockfile"), minio.GetObjectOptions{})
+	if err != nil {
+		s.log.Info("unexpected error fetching lockfile", "err", err)
+		return Lockfile{}, ErrStorage
+	}
+	defer res.Close()
+	_, err = res.Stat()
+	if err != nil {
+		errResponse := minio.ToErrorResponse(err)
+		if errResponse.Code == "NoSuchKey" {
+			s.log.Info("unable to find lockfile key")
+			return Lockfile{}, ErrNotFound
+		} else {
+			s.log.Info("unexpected error fetching lockfile", "err", err)
+			return Lockfile{}, ErrStorage
+		}
+	}
+
+	var reader io.ReadCloser = res
+	defer reader.Close()
+
+	var data Lockfile
+	err = json.NewDecoder(reader).Decode(&data)
+	if err != nil {
+		s.log.Warn("error decoding lockfile", "err", err)
+		return Lockfile{}, ErrMarshaling
+	}
+
+	return data, nil
+}
+
+func (s *S3Storage) WriteBackfillProcesses(ctx context.Context, data BackfillProcesses) error {
+	BackfillMu.Lock()
+	defer BackfillMu.Unlock()
+
+	d, err := json.Marshal(data)
+	if err != nil {
+		s.log.Warn("error encoding backfill_processes", "err", err)
+		return ErrMarshaling
+	}
+
+	options := minio.PutObjectOptions{
+		ContentType: "application/json",
+	}
+	reader := bytes.NewReader(d)
+
+	_, err = s.s3.PutObject(ctx, s.bucket, path.Join(s.path, "backfill_processes"), reader, int64(len(d)), options)
+	if err != nil {
+		s.log.Warn("error writing to backfill_processes", "err", err)
+		return ErrStorage
+	}
+
+	s.log.Info("wrote to backfill_processes")
+	return nil
+}
+
+func (s *S3Storage) WriteLockfile(ctx context.Context, data Lockfile) error {
+	d, err := json.Marshal(data)
+	if err != nil {
+		s.log.Warn("error encoding lockfile", "err", err)
+		return ErrMarshaling
+	}
+
+	options := minio.PutObjectOptions{
+		ContentType: "application/json",
+	}
+	reader := bytes.NewReader(d)
+
+	_, err = s.s3.PutObject(ctx, s.bucket, path.Join(s.path, "lockfile"), reader, int64(len(d)), options)
+	if err != nil {
+		s.log.Warn("error writing to lockfile", "err", err)
+		return ErrStorage
+	}
+
+	s.log.Info("wrote to lockfile", "archiverId", data.ArchiverId, "timestamp", strconv.FormatInt(data.Timestamp, 10))
+	return nil
+}
+
+func (s *S3Storage) WriteBlob(ctx context.Context, data BlobData) error {
 	b, err := json.Marshal(data)
 	if err != nil {
 		s.log.Warn("error encoding blob", "err", err)
