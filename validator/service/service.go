@@ -14,6 +14,7 @@ import (
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/base-org/blob-archiver/common/storage"
+	"github.com/base-org/blob-archiver/validator/flags"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -29,14 +30,21 @@ const (
 	retryAttempts = 10
 )
 
-func NewValidator(l log.Logger, headerClient client.BeaconBlockHeadersProvider, beaconAPI BlobSidecarClient, blobAPI BlobSidecarClient, app context.CancelCauseFunc, numBlocks int) *ValidatorService {
+var (
+	formatSettingToHeader = map[string]Format{
+		"json": FormatJson,
+		"ssz":  FormatSSZ,
+	}
+)
+
+func NewValidator(l log.Logger, headerClient client.BeaconBlockHeadersProvider, beaconAPI BlobSidecarClient, blobAPI BlobSidecarClient, app context.CancelCauseFunc, cfg flags.ValidatorConfig) *ValidatorService {
 	return &ValidatorService{
 		log:          l,
 		headerClient: headerClient,
 		beaconAPI:    beaconAPI,
 		blobAPI:      blobAPI,
 		closeApp:     app,
-		numBlocks:    numBlocks,
+		cfg:          cfg,
 	}
 }
 
@@ -47,7 +55,7 @@ type ValidatorService struct {
 	beaconAPI    BlobSidecarClient
 	blobAPI      BlobSidecarClient
 	closeApp     context.CancelCauseFunc
-	numBlocks    int
+	cfg          flags.ValidatorConfig
 }
 
 // Start starts the validator service. This will fetch the current range of blocks to validate and start the validation
@@ -64,7 +72,7 @@ func (a *ValidatorService) Start(ctx context.Context) error {
 	}
 
 	end := header.Data.Header.Message.Slot - finalizedL1Offset
-	start := end - phase0.Slot(a.numBlocks)
+	start := end - phase0.Slot(a.cfg.NumBlocks)
 
 	go a.checkBlobs(ctx, start, end)
 
@@ -126,7 +134,9 @@ func (a *ValidatorService) checkBlobs(ctx context.Context, start phase0.Slot, en
 	var result CheckBlobResult
 
 	for slot := start; slot <= end; slot++ {
-		for _, format := range []Format{FormatJson, FormatSSZ} {
+		for _, setting := range a.cfg.ValidateFormats {
+			format := formatSettingToHeader[setting]
+
 			id := strconv.FormatUint(uint64(slot), 10)
 
 			l := a.log.New("format", format, "slot", slot)

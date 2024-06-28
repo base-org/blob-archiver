@@ -199,7 +199,7 @@ func (a *Archiver) backfillBlobs(ctx context.Context, latest *v1.BeaconBlockHead
 		a.log.Crit("failed to read backfill_processes", "err", err)
 	}
 	backfillProcesses[common.Hash(latest.Root)] = storage.BackfillProcess{Start: *latest, Current: *latest}
-	a.dataStoreClient.WriteBackfillProcesses(ctx, backfillProcesses)
+	_ = a.dataStoreClient.WriteBackfillProcesses(ctx, backfillProcesses)
 
 	backfillLoop := func(start *v1.BeaconBlockHeader, current *v1.BeaconBlockHeader) {
 		curr, alreadyExists, err := current, false, error(nil)
@@ -219,7 +219,7 @@ func (a *Archiver) backfillBlobs(ctx context.Context, latest *v1.BeaconBlockHead
 				"startSlot", start.Header.Message.Slot,
 			)
 			delete(backfillProcesses, common.Hash(start.Root))
-			a.dataStoreClient.WriteBackfillProcesses(ctx, backfillProcesses)
+			_ = a.dataStoreClient.WriteBackfillProcesses(ctx, backfillProcesses)
 		}()
 
 		for !alreadyExists {
@@ -246,7 +246,7 @@ func (a *Archiver) backfillBlobs(ctx context.Context, latest *v1.BeaconBlockHead
 			count++
 			if count%10 == 0 {
 				backfillProcesses[common.Hash(start.Root)] = storage.BackfillProcess{Start: *start, Current: *curr}
-				a.dataStoreClient.WriteBackfillProcesses(ctx, backfillProcesses)
+				_ = a.dataStoreClient.WriteBackfillProcesses(ctx, backfillProcesses)
 			}
 		}
 	}
