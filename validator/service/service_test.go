@@ -12,6 +12,7 @@ import (
 	"github.com/base-org/blob-archiver/common/beacon/beacontest"
 	"github.com/base-org/blob-archiver/common/blobtest"
 	"github.com/base-org/blob-archiver/common/storage"
+	"github.com/base-org/blob-archiver/validator/flags"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
@@ -71,9 +72,10 @@ func setup(t *testing.T) (*ValidatorService, *beacontest.StubBeaconClient, *stub
 		data: make(map[string]response),
 	}
 
-	numBlocks := 600
-
-	return NewValidator(l, headerClient, beacon, blob, cancel, numBlocks), headerClient, beacon, blob
+	return NewValidator(l, headerClient, beacon, blob, cancel, flags.ValidatorConfig{
+		ValidateFormats: []string{"json", "ssz"},
+		NumBlocks:       600,
+	}), headerClient, beacon, blob
 }
 
 func TestValidatorService_OnFetchError(t *testing.T) {

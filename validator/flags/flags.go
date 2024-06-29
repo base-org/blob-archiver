@@ -34,11 +34,18 @@ var (
 		Required: true,
 		EnvVars:  opservice.PrefixEnvVar(EnvVarPrefix, "NUM_BLOCKS"),
 	}
+	ValidateFormatsFlag = &cli.StringSliceFlag{
+		Name:     "validate-formats",
+		Usage:    "The formats to validate [json, ssz]",
+		Value:    cli.NewStringSlice("json", "ssz"),
+		Required: true,
+		EnvVars:  opservice.PrefixEnvVar(EnvVarPrefix, "VALIDATE_FORMATS"),
+	}
 )
 
 func init() {
 	Flags = append(Flags, oplog.CLIFlags(EnvVarPrefix)...)
-	Flags = append(Flags, BeaconClientTimeoutFlag, L1BeaconClientUrlFlag, BlobApiClientUrlFlag, NumBlocksClientFlag)
+	Flags = append(Flags, BeaconClientTimeoutFlag, L1BeaconClientUrlFlag, BlobApiClientUrlFlag, NumBlocksClientFlag, ValidateFormatsFlag)
 }
 
 // Flags contains the list of configuration options available to the binary.
